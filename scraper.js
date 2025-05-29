@@ -1,4 +1,4 @@
-const { chromium } = require('playwright'); 
+const { chromium } = require('playwright-chromium');
 
 async function scrapeRemax(pageNumber = 0, endPage) {
     let allProperties = [];

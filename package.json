@@ -4,16 +4,14 @@
   "main": "index.js",
   "scripts": {
     "test": "node test.js",
-    "start": "node api/scrape.js",
-    "build": "npx playwright install chromium --force",
-    "postinstall": "npx playwright install chromium --force"
+    "start": "node api/scrape.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "playwright": "^1.52.0"
+    "playwright-chromium": "^1.52.0"
   },
   "engines": {
     "node": "20.x"
