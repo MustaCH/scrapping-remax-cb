@@ -115,24 +115,27 @@ async function scrapeRemax(pageNumber = 0, endPage) {
 }
 
 // Función handler para Vercel
-async function handler(req, res) {
-    // Configurar headers CORS
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-    if (req.method === 'OPTIONS') {
-        return res.status(200).end();
-    }
-
+module.exports = async function handler(req, res) {
     try {
+        // Configurar headers CORS
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+        if (req.method === 'OPTIONS') {
+            return res.status(200).end();
+        }
+
         // Obtener parámetros de la query string o body
-        const { pageNumber = 0, endPage } = req.method === 'GET' ? req.query : req.body;
+        const { pageNumber = 0, endPage, startPage } = req.method === 'GET' ? req.query : req.body;
         
-        console.log(`Iniciando scraping desde página ${pageNumber}${endPage ? ` hasta página ${endPage}` : ''}`);
+        // Usar startPage si está disponible, sino pageNumber
+        const initialPage = startPage ? parseInt(startPage) : parseInt(pageNumber);
+        
+        console.log(`Iniciando scraping desde página ${initialPage}${endPage ? ` hasta página ${endPage}` : ''}`);
         
         const properties = await scrapeRemax(
-            parseInt(pageNumber) || 0, 
+            initialPage || 0, 
             endPage ? parseInt(endPage) : undefined
         );
 
@@ -140,7 +143,7 @@ async function handler(req, res) {
             success: true,
             data: properties,
             count: properties.length,
-            pageNumber: parseInt(pageNumber) || 0,
+            startPage: initialPage || 0,
             endPage: endPage ? parseInt(endPage) : undefined
         });
 
@@ -152,6 +155,4 @@ async function handler(req, res) {
             stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
         });
     }
-}
-
-module.exports = handler;
+};
