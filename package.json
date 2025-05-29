@@ -5,7 +5,7 @@
   "scripts": {
     "test": "node test.js",
     "start": "node api/scrape.js",
-    "postinstall": "npx playwright install --with-deps chromium"
+    "postinstall": "npx playwright install chromium"
   },
   "keywords": [],
   "author": "",
