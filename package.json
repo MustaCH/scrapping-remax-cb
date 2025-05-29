@@ -4,7 +4,8 @@
   "main": "api/scrape.js",
   "scripts": {
     "test": "node test.js",
-    "start": "node api/scrape.js"
+    "start": "node api/scrape.js",
+    "postinstall": "npx playwright install --with-deps chromium"
   },
   "keywords": [],
   "author": "",
