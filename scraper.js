@@ -5,7 +5,18 @@ async function scrapeRemax(pageNumber = 0, endPage) {
     let browser;
 
     try {
-        browser = await chromium.launch({ headless: true }); 
+        browser = await chromium.launch({ 
+            headless: true,
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-accelerated-2d-canvas',
+                '--no-first-run',
+                '--no-zygote',
+                '--disable-gpu',
+                '--single-process' 
+            ] }); 
 
         const page = await browser.newPage({
             userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
