@@ -5,7 +5,8 @@
   "scripts": {
     "test": "node test.js",
     "start": "node api/scrape.js",
-    "postinstall": "npx playwright install chromium"
+    "build": "npx playwright install chromium --force",
+    "postinstall": "npx playwright install chromium --force"
   },
   "keywords": [],
   "author": "",
@@ -13,5 +14,8 @@
   "description": "",
   "dependencies": {
     "playwright": "^1.52.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
