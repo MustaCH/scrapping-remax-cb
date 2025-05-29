@@ -113,45 +113,4 @@ async function scrapeRemax(pageNumber = 0, endPage) {
     return allProperties;
 }
 
-// Función handler para Vercel
-module.exports = async function handler(req, res) {
-    try {
-        // Configurar headers CORS
-        res.setHeader('Access-Control-Allow-Origin', '*');
-        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-        if (req.method === 'OPTIONS') {
-            return res.status(200).end();
-        }
-
-        // Obtener parámetros de la query string o body
-        const { pageNumber = 0, endPage, startPage } = req.method === 'GET' ? req.query : req.body;
-        
-        // Usar startPage si está disponible, sino pageNumber
-        const initialPage = startPage ? parseInt(startPage) : parseInt(pageNumber);
-        
-        console.log(`Iniciando scraping desde página ${initialPage}${endPage ? ` hasta página ${endPage}` : ''}`);
-        
-        const properties = await scrapeRemax(
-            initialPage || 0, 
-            endPage ? parseInt(endPage) : undefined
-        );
-
-        res.status(200).json({
-            success: true,
-            data: properties,
-            count: properties.length,
-            startPage: initialPage || 0,
-            endPage: endPage ? parseInt(endPage) : undefined
-        });
-
-    } catch (error) {
-        console.error('Error en el handler:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message,
-            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-        });
-    }
-};
+module.exports = scrapeRemax;
