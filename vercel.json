@@ -5,11 +5,12 @@
         "maxDuration": 60
       }
     },
+    "env": {
+      "PLAYWRIGHT_BROWSERS_PATH": "0"
+    },
     "build": {
       "env": {
-        "PLAYWRIGHT_BROWSERS_PATH": "/tmp/ms-playwright",
-        "PLAYWRIGHT_CHROMIUM_PATH": "/tmp/ms-playwright/chromium/chrome-linux/chrome",
-        "PLAYWRIGHT_INSTALL_DIR": "/tmp/ms-playwright"
+        "PLAYWRIGHT_BROWSERS_PATH": "0"
       }
     }
   }
