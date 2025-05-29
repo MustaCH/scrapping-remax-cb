@@ -57,7 +57,7 @@ async function scrapeRemax(pageNumber = 0, endPage) {
         }
 
         // Limitar páginas para evitar timeout en Vercel
-        const maxPagesToScrape = Math.min(maxPages, pageNumber + 5); // Solo 5 páginas por request
+        const maxPagesToScrape = Math.min(maxPages, pageNumber + 5);
 
         for (let currentPage = pageNumber; currentPage <= maxPagesToScrape; currentPage++) {
             console.log(`Scraping page: ${currentPage}`);
@@ -99,13 +99,12 @@ async function scrapeRemax(pageNumber = 0, endPage) {
             }
 
             allProperties = allProperties.concat(pageProperties);
-
-            await page.waitForTimeout(500); // Reducir tiempo de espera
+            await page.waitForTimeout(500);
         }
 
     } catch (error) {
         console.error('Error durante el scraping:', error);
-        throw error; // Re-lanzar el error para que Vercel lo capture
+        throw error;
     } finally {
         if (browser) {
             await browser.close();
