@@ -1,7 +1,7 @@
 {
   "name": "remax-scrapper",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "api/scrape.js",
   "scripts": {
     "test": "node test.js",
     "start": "node api/scrape.js"
