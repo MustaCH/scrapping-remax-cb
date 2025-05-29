@@ -1,22 +1,11 @@
-const { chromium } = require('playwright-chromium');
+const { chromium } = require('playwright'); 
 
 async function scrapeRemax(pageNumber = 0, endPage) {
     let allProperties = [];
     let browser;
 
     try {
-        browser = await chromium.launch({ 
-            headless: true,
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-accelerated-2d-canvas',
-                '--no-first-run',
-                '--no-zygote',
-                '--disable-gpu'
-            ]
-        }); 
+        browser = await chromium.launch({ headless: true }); 
 
         const page = await browser.newPage({
             userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
@@ -26,12 +15,14 @@ async function scrapeRemax(pageNumber = 0, endPage) {
         if (!endPage) { 
             console.log('Intentando determinar el número total de páginas...');
             const firstPageUrl = `https://www.remax.com.ar/listings/buy?page=0&pageSize=24&sort=-createdAt&in:operationId=1&in:eStageId=0,1,2,3,4&locations=in:CB@C%C3%B3rdoba::::::&landingPath=&filterCount=0&viewMode=mapViewMode`;
-            await page.goto(firstPageUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+            await page.goto(firstPageUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
+           
             const totalPagesInfoSelector = '.p-container-paginator p'; 
+            
 
             try {
-                await page.waitForSelector(totalPagesInfoSelector, { state: 'attached', timeout: 10000 });
+                await page.waitForSelector(totalPagesInfoSelector, { state: 'attached', timeout: 15000 });
                 const fullPaginationText = await page.$eval(totalPagesInfoSelector, el => el.textContent);
                 
                 const match = fullPaginationText.match(/de (\d+)/);
@@ -56,18 +47,15 @@ async function scrapeRemax(pageNumber = 0, endPage) {
             }
         }
 
-        // Limitar páginas para evitar timeout en Vercel
-        const maxPagesToScrape = Math.min(maxPages, pageNumber + 5);
-
-        for (let currentPage = pageNumber; currentPage <= maxPagesToScrape; currentPage++) {
+        for (let currentPage = pageNumber; currentPage <= maxPages; currentPage++) {
             console.log(`Scraping page: ${currentPage}`);
             const url = `https://www.remax.com.ar/listings/buy?page=${currentPage}&pageSize=24&sort=-createdAt&in:operationId=1&in:eStageId=0,1,2,3,4&locations=in:CB@C%C3%B3rdoba::::::&landingPath=&filterCount=0&viewMode=mapViewMode`;
 
-            await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 }); 
+            await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 100000 }); 
 
             const propertyListSelector = '#card-map'; 
             try {
-                await page.waitForSelector(propertyListSelector, { state: 'visible', timeout: 15000 });
+                await page.waitForSelector(propertyListSelector, { state: 'visible', timeout: 30000 });
             } catch (error) {
                 console.warn(`No se encontró el selector de lista de propiedades en la página ${currentPage}. Es posible que no haya más propiedades o que el selector sea incorrecto.`, error.message);
                 break; 
@@ -99,12 +87,12 @@ async function scrapeRemax(pageNumber = 0, endPage) {
             }
 
             allProperties = allProperties.concat(pageProperties);
-            await page.waitForTimeout(500);
+
+            await page.waitForTimeout(1000);
         }
 
     } catch (error) {
         console.error('Error durante el scraping:', error);
-        throw error;
     } finally {
         if (browser) {
             await browser.close();

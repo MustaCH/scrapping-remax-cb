@@ -1,20 +1,15 @@
 {
   "name": "remax-scrapper",
   "version": "1.0.0",
-  "main": "api/scrape.js",
+  "main": "index.js",
   "scripts": {
-    "test": "node test.js",
-    "start": "node api/scrape.js",
-    "postinstall": "npx playwright install chromium"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "playwright-chromium": "^1.52.0"
-  },
-  "engines": {
-    "node": "20.x"
+    "playwright": "^1.52.0"
   }
 }
