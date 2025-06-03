@@ -64,7 +64,7 @@ async function scrapeRemax(pageNumber = 0, endPage) {
 
             await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 100000 }); 
 
-            const propertyListSelector = '#card-map'; 
+            const propertyListSelector = '#card-container'; 
             try {
                 await page.waitForSelector(propertyListSelector, { state: 'visible', timeout: 30000 });
             } catch (error) {
