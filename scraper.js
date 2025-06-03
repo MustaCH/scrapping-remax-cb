@@ -109,7 +109,7 @@ async function scrapeRemax(pageNumber = 0, endPage) {
             await browser.close();
         }
     }
-    return allProperties;
+    return {properties: allProperties, maxPages: maxPages};
 }
 
 module.exports = scrapeRemax;
