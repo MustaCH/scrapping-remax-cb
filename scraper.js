@@ -112,4 +112,71 @@ async function scrapeRemax(pageNumber = 0, endPage) {
     return allProperties;
 }
 
-module.exports = scrapeRemax;
+//getMaxPages.js
+// Esta función obtiene el número máximo de páginas disponibles en el sitio web de RE/MAX
+
+async function getMaxPages() {
+    let browser;
+    
+    try {
+        browser = await chromium.launch({ 
+            headless: true,
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-accelerated-2d-canvas',
+                '--no-first-run',
+                '--no-zygote',
+                '--disable-gpu',
+                '--single-process' 
+            ] 
+        }); 
+
+        const page = await browser.newPage({
+            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
+        });
+
+        console.log('Obteniendo número total de páginas...');
+        const firstPageUrl = `https://www.remax.com.ar/listings/buy?page=0&pageSize=24&sort=-createdAt&in:operationId=1&in:eStageId=0,1,2,3,4&locations=in:CB@C%C3%B3rdoba::::::&landingPath=&filterCount=0&viewMode=mapViewMode`;
+        
+        await page.goto(firstPageUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+
+        const totalPagesInfoSelector = '.p-container-paginator p';
+        
+        try {
+            await page.waitForSelector(totalPagesInfoSelector, { state: 'attached', timeout: 15000 });
+            const fullPaginationText = await page.$eval(totalPagesInfoSelector, el => el.textContent);
+            
+            const match = fullPaginationText.match(/de (\d+)/);
+            
+            if (match && match[1]) {
+                const parsedTotalPages = parseInt(match[1]);
+                if (!isNaN(parsedTotalPages) && parsedTotalPages > 0) {
+                    console.log(`Número total de páginas detectado: ${parsedTotalPages}`);
+                    return parsedTotalPages;
+                } else {
+                    console.warn('No se pudo parsear el número total de páginas. Usando fallback.');
+                    return 175;
+                }
+            } else {
+                console.warn('Formato de paginación no reconocido. Usando fallback.');
+                return 175; 
+            }
+
+        } catch (err) {
+            console.warn(`Error obteniendo paginación: ${err.message}. Usando fallback.`);
+            return 175;
+        }
+
+    } catch (error) {
+        console.error('Error obteniendo maxPages:', error);
+        throw error;
+    } finally {
+        if (browser) {
+            await browser.close();
+        }
+    }
+}
+
+module.exports = { scrapeRemax, getMaxPages };
