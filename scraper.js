@@ -48,7 +48,7 @@ async function scrapeRemax(startPage = 0, endPage = 10) {
                 continue;
             }
         }
-
+// Asegurarse de que el selector es correcto
         try {
             const pageProperties = await page.evaluate(() => {
                 const properties = [];
