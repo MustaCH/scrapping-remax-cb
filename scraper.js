@@ -81,8 +81,8 @@ async function scrapeRemax(startPage = 0, endPage = 10) {
         } catch (err) {
             console.error(`Error al extraer propiedades en página ${currentPage}: ${err.message}`);
         }
-        
-        await page.close();     // ✅ Cerramos la pestaña fallida
+
+        await page.close();     
         await browser.close();
         await new Promise(resolve => setTimeout(resolve, 1000)); // anti-ban, delay suave
     }
