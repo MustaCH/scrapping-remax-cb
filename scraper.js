@@ -84,7 +84,7 @@ async function scrapeRemax(startPage = 0, endPage = 10) {
 
         await page.close();     
         await browser.close();
-        await new Promise(resolve => setTimeout(resolve, 1000)); // anti-ban, delay suave
+        await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
     return allProperties;
