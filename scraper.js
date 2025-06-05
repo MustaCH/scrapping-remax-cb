@@ -34,13 +34,19 @@ async function scrapeRemax(startPage = 0, endPage = 10) {
             continue;
         }
 
-        const propertyListSelector = '#card-map';
+        let propertyListSelector = '#card-map';
         try {
-            await page.waitForSelector(propertyListSelector, { state: 'visible', timeout: 30000 });
+            await page.waitForSelector(propertyListSelector, { state: 'visible', timeout: 10000 });
         } catch (err) {
-            console.warn(`No se encontró el selector en la página ${currentPage}: ${err.message}`);
-            await browser.close();
-            continue;
+            console.warn(`No se encontró '#card-map', intentando con '#card-container' en página ${currentPage}`);
+            propertyListSelector = '#card-container';
+            try {
+                await page.waitForSelector(propertyListSelector, { state: 'visible', timeout: 10000 });
+            } catch (innerErr) {
+                console.warn(`Tampoco se encontró '#card-container' en página ${currentPage}. Saltando...`);
+                await browser.close();
+                continue;
+            }
         }
 
         try {
