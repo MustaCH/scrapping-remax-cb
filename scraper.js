@@ -3,7 +3,6 @@ const { chromium } = require('playwright');
 async function scrapeRemax(pageNumber = 0, endPage) {
     let allProperties = [];
     let browser;
-    let detectedMaxPages = endPage; // <--- DECLARADA E INICIALIZADA AQUÍ
 
     try {
         browser = await chromium.launch({ 
@@ -24,7 +23,7 @@ async function scrapeRemax(pageNumber = 0, endPage) {
         });
 
         let maxPages = endPage; 
-        if (typeof endPage === 'undefined' || endPage === null || !endPage) { 
+        if (!endPage) { 
             console.log('Intentando determinar el número total de páginas...');
             const firstPageUrl = `https://www.remax.com.ar/listings/buy?page=0&pageSize=24&sort=-createdAt&in:operationId=1&in:eStageId=0,1,2,3,4&locations=in:CB@C%C3%B3rdoba::::::&landingPath=&filterCount=0&viewMode=mapViewMode`;
             await page.goto(firstPageUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
@@ -57,8 +56,6 @@ async function scrapeRemax(pageNumber = 0, endPage) {
                 console.warn(`No se encontró el selector de información de paginación o hubo un error: ${err.message}. Usando un límite por defecto.`);
                 maxPages = 175;
             }
-            await browser.close();
-            return { properties: [], maxPages: detectedMaxPages };
         }
 
         for (let currentPage = pageNumber; currentPage <= maxPages; currentPage++) {
@@ -67,7 +64,7 @@ async function scrapeRemax(pageNumber = 0, endPage) {
 
             await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 100000 }); 
 
-            const propertyListSelector = '#card-container'; 
+            const propertyListSelector = '#card-map'; 
             try {
                 await page.waitForSelector(propertyListSelector, { state: 'visible', timeout: 30000 });
             } catch (error) {
@@ -107,17 +104,12 @@ async function scrapeRemax(pageNumber = 0, endPage) {
 
     } catch (error) {
         console.error('Error durante el scraping:', error);
-        if(typeof endPage !== 'undefined' && endPage !== null) {
-            detectedMaxPages = endPage; 
-        } else {
-            detectedMaxPages = effectiveMaxPages || -1;
-        }
     } finally {
-        if (browser && browser.isConnected()) {
+        if (browser) {
             await browser.close();
         }
     }
-    return {properties: allProperties, maxPages: detectedMaxPages};
+    return allProperties;
 }
 
 module.exports = scrapeRemax;
