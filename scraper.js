@@ -44,6 +44,7 @@ async function scrapeRemax(startPage = 0, endPage = 10) {
                 await page.waitForSelector(propertyListSelector, { state: 'visible', timeout: 10000 });
             } catch (innerErr) {
                 console.warn(`Tampoco se encontró '#card-container' en página ${currentPage}. Saltando...`);
+                await page.close();     // ✅ Cerramos la pestaña fallida
                 await browser.close();
                 continue;
             }
@@ -80,7 +81,8 @@ async function scrapeRemax(startPage = 0, endPage = 10) {
         } catch (err) {
             console.error(`Error al extraer propiedades en página ${currentPage}: ${err.message}`);
         }
-
+        
+        await page.close();     // ✅ Cerramos la pestaña fallida
         await browser.close();
         await new Promise(resolve => setTimeout(resolve, 1000)); // anti-ban, delay suave
     }
