@@ -36,7 +36,7 @@ async function scrapeRemax(startPage = 0, endPage = 10) {
 
         const propertyListSelector = '#card-map';
         try {
-            await page.waitForSelector(propertyListSelector, { state: 'visible', timeout: 20000 });
+            await page.waitForSelector(propertyListSelector, { state: 'visible', timeout: 30000 });
         } catch (err) {
             console.warn(`No se encontró el selector en la página ${currentPage}: ${err.message}`);
             await browser.close();
