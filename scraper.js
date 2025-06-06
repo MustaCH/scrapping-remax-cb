@@ -54,48 +54,56 @@ async function scrapeRemax(startPage = 0, endPage) {
         
         let allProperties = [];
         for (let currentPage = startPage; currentPage <= endPage; currentPage++) {
-            console.log(`Scraping página: ${currentPage}`);
-            const url = `https://www.remax.com.ar/listings/buy?page=${currentPage}&pageSize=24&sort=-createdAt&in:operationId=1&in:eStageId=0,1,2,3,4&locations=in:CB@C%C3%B3rdoba::::::&landingPath=&filterCount=0&viewMode=mapViewMode`;
-            await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 90000 });
             
-            // ✅ LÍNEA REINTRODUCIDA Y CRUCIAL
-            // Espera a que el contenedor de las tarjetas (#card-map) esté visible.
-            console.log('Esperando a que el contenedor de propiedades aparezca...');
-            const propertyListSelector = '#card-map';
-            await page.waitForSelector(propertyListSelector, { state: 'visible', timeout: 30000 });
-            console.log('✅ Contenedor de propiedades encontrado. Extrayendo datos...');
+            // ✅ EL TRY...CATCH AHORA ENVUELVE CADA PÁGINA INDIVIDUALMENTE
+            try {
+                console.log(`Procesando página: ${currentPage}`);
+                const url = `https://www.remax.com.ar/listings/buy?page=${currentPage}&pageSize=24&sort=-createdAt&in:operationId=1&in:eStageId=0,1,2,3,4&locations=in:CB@C%C3%B3rdoba::::::&landingPath=&filterCount=0&viewMode=mapViewMode`;
+                await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 90000 });
+                
+                console.log(`  -> Esperando a que el contenedor de propiedades aparezca...`);
+                const propertyListSelector = '#card-map';
+                await page.waitForSelector(propertyListSelector, { state: 'visible', timeout: 30000 });
+                console.log(`  -> ✅ Contenedor encontrado. Extrayendo datos...`);
 
-            const pageProperties = await page.evaluate(() => {
-                const properties = [];
-                document.querySelectorAll('qr-card-property').forEach(card => {
-                    const titleElement = card.querySelector('.card__description-and-brokers');
-                    const priceElement = card.querySelector('.card__price-and-expenses');
-                    const featureElement = card.querySelector('.card__feature');
-                    const urlElement = card.querySelector('.card-remax__href');
-                    if (titleElement && urlElement) {
-                        properties.push({
-                            title: titleElement.textContent.trim(),
-                            price: priceElement ? priceElement.textContent.trim() : 'No disponible',
-                            features: featureElement ? featureElement.textContent.trim() : 'No disponible',
-                            url: urlElement.href,
-                        });
-                    }
+                const pageProperties = await page.evaluate(() => {
+                    const properties = [];
+                    document.querySelectorAll('qr-card-property').forEach(card => {
+                        const titleElement = card.querySelector('.card__description-and-brokers');
+                        const priceElement = card.querySelector('.card__price-and-expenses');
+                        const featureElement = card.querySelector('.card__feature');
+                        const urlElement = card.querySelector('.card-remax__href');
+                        if (titleElement && urlElement) {
+                            properties.push({
+                                title: titleElement.textContent.trim(),
+                                price: priceElement ? priceElement.textContent.trim() : 'No disponible',
+                                features: featureElement ? featureElement.textContent.trim() : 'No disponible',
+                                url: urlElement.href,
+                            });
+                        }
+                    });
+                    return properties;
                 });
-                return properties;
-            });
 
-            if (pageProperties.length === 0) {
-                console.log(`No se encontraron propiedades en la página ${currentPage}. Es posible que la página esté vacía.`);
-                break;
+                if (pageProperties.length === 0) {
+                    console.log(`  -> No se encontraron propiedades en la página ${currentPage}. Finalizando el lote.`);
+                    break; 
+                }
+                
+                console.log(`  -> Se encontraron ${pageProperties.length} propiedades.`);
+                allProperties = allProperties.concat(pageProperties);
+
+            } catch (pageError) {
+                // Si una página falla, lo registramos y continuamos con la siguiente
+                console.warn(`⚠️ Error al procesar la página ${currentPage}: ${pageError.message}. Continuando con la siguiente...`);
+                continue;
             }
-            console.log(`Se encontraron ${pageProperties.length} propiedades en esta página.`);
-            allProperties = allProperties.concat(pageProperties);
-            await page.waitForTimeout(500);
         }
         return allProperties;
     } catch (error) {
-        console.error(`Error en scrapeRemax para lote ${startPage}-${endPage}:`, error);
-        throw error; // Lanzamos el error para que la ruta principal lo capture
+        // Este catch ahora solo se activará si falla el inicio del navegador
+        console.error(`Error fatal en scrapeRemax para lote ${startPage}-${endPage}:`, error);
+        throw error;
     } finally {
         if (browser) {
             await browser.close();
