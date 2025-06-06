@@ -2,13 +2,13 @@ const { chromium } = require('playwright');
 
 /**
  * Inicia y devuelve una única instancia del navegador Chromium.
- * Esta función se debe llamar solo una vez al iniciar el servidor.
  */
 async function initializeBrowser() {
     console.log('Iniciando instancia del navegador Chromium...');
     try {
         const browser = await chromium.launch({
-            headless: true,
+            // ✅ CAMBIO CLAVE: Usar el nuevo modo headless, más robusto para contenedores.
+            headless: "new", 
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
@@ -46,10 +46,11 @@ async function getMaxPages(browser) {
 
     try {
         const firstPageUrl = `https://www.remax.com.ar/listings/buy?page=0&pageSize=24&sort=-createdAt&in:operationId=1&in:eStageId=0,1,2,3,4&locations=in:CB@C%C3%B3rdoba::::::&landingPath=&filterCount=0&viewMode=mapViewMode`;
-        await page.goto(firstPageUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+        // Aumentamos un poco el timeout por si la red de Railway es lenta
+        await page.goto(firstPageUrl, { waitUntil: 'domcontentloaded', timeout: 90000 }); 
 
         const totalPagesInfoSelector = '.p-container-paginator p';
-        await page.waitForSelector(totalPagesInfoSelector, { state: 'attached', timeout: 15000 });
+        await page.waitForSelector(totalPagesInfoSelector, { state: 'attached', timeout: 20000 });
 
         const fullPaginationText = await page.$eval(totalPagesInfoSelector, el => el.textContent);
         const match = fullPaginationText.match(/de (\d+)/);
@@ -70,7 +71,7 @@ async function getMaxPages(browser) {
         return 175;
     } finally {
         try {
-            await page.close(); // Cierra solo la página, no el navegador
+            await page.close();
             console.log('Página para obtener maxPages cerrada.');
         } catch (closeError) {
             console.error('Error al cerrar la página de getMaxPages (ignorado):', closeError.message);
@@ -100,7 +101,7 @@ async function scrapeRemax(browser, startPage = 0, endPage) {
             console.log(`Scraping página: ${currentPage}`);
             const url = `https://www.remax.com.ar/listings/buy?page=${currentPage}&pageSize=24&sort=-createdAt&in:operationId=1&in:eStageId=0,1,2,3,4&locations=in:CB@C%C3%B3rdoba::::::&landingPath=&filterCount=0&viewMode=mapViewMode`;
 
-            await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
+            await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 90000 });
 
             const propertyListSelector = '#card-map';
             try {
@@ -135,17 +136,14 @@ async function scrapeRemax(browser, startPage = 0, endPage) {
             }
 
             allProperties = allProperties.concat(pageProperties);
-
-            // Una pequeña pausa para no saturar el servidor de Remax
             await page.waitForTimeout(500);
         }
     } catch (error) {
         console.error(`Error durante el scraping del lote ${startPage}-${endPage}:`, error);
-        // Devuelve lo que se haya conseguido hasta ahora
         return allProperties;
     } finally {
         try {
-            await page.close(); // Cierra la página al terminar el lote
+            await page.close();
             console.log(`Página para el lote ${startPage}-${endPage} cerrada.`);
         } catch (closeError) {
             console.error(`Error al cerrar la página del lote ${startPage}-${endPage} (ignorado):`, closeError.message);
