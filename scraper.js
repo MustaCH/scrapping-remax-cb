@@ -7,8 +7,8 @@ async function initializeBrowser() {
     console.log('Iniciando instancia del navegador Chromium...');
     try {
         const browser = await chromium.launch({
-            // ✅ CAMBIO CLAVE: Usar el nuevo modo headless, más robusto para contenedores.
-            headless: "new", 
+            // La opción 'headless' se elimina para usar el modo por defecto de Playwright,
+            // que es el nuevo modo headless, más robusto.
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
@@ -46,7 +46,6 @@ async function getMaxPages(browser) {
 
     try {
         const firstPageUrl = `https://www.remax.com.ar/listings/buy?page=0&pageSize=24&sort=-createdAt&in:operationId=1&in:eStageId=0,1,2,3,4&locations=in:CB@C%C3%B3rdoba::::::&landingPath=&filterCount=0&viewMode=mapViewMode`;
-        // Aumentamos un poco el timeout por si la red de Railway es lenta
         await page.goto(firstPageUrl, { waitUntil: 'domcontentloaded', timeout: 90000 }); 
 
         const totalPagesInfoSelector = '.p-container-paginator p';
