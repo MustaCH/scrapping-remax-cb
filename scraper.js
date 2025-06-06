@@ -7,8 +7,7 @@ async function initializeBrowser() {
     console.log('Iniciando instancia del navegador Chromium...');
     try {
         const browser = await chromium.launch({
-            // La opción 'headless' se elimina para usar el modo por defecto de Playwright,
-            // que es el nuevo modo headless, más robusto.
+            // Usamos el modo por defecto de Playwright que es el nuevo modo headless
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
@@ -30,12 +29,10 @@ async function initializeBrowser() {
 
 /**
  * Obtiene el número máximo de páginas de propiedades.
- * Reutiliza la instancia principal del navegador.
- * @param {import('playwright').Browser} browser - La instancia del navegador.
  */
 async function getMaxPages(browser) {
-    if (!browser) {
-        throw new Error('El navegador no está inicializado.');
+    if (!browser || !browser.isConnected()) { // Verificación extra
+        throw new Error('El navegador no está inicializado o se ha desconectado.');
     }
 
     const page = await browser.newPage({
@@ -61,7 +58,7 @@ async function getMaxPages(browser) {
                 return parsedTotalPages;
             }
         }
-
+        
         console.warn('No se pudo parsear el número total de páginas. Usando fallback: 175.');
         return 175;
 
@@ -69,8 +66,9 @@ async function getMaxPages(browser) {
         console.warn(`Error obteniendo paginación: ${err.message}. Usando fallback: 175.`);
         return 175;
     } finally {
+        // ASEGÚRATE DE QUE ESTA PARTE SEA EXACTAMENTE ASÍ
         try {
-            await page.close();
+            await page.close(); // DEBE SER page.close()
             console.log('Página para obtener maxPages cerrada.');
         } catch (closeError) {
             console.error('Error al cerrar la página de getMaxPages (ignorado):', closeError.message);
@@ -81,13 +79,10 @@ async function getMaxPages(browser) {
 
 /**
  * Scrapea un rango de páginas de propiedades.
- * @param {import('playwright').Browser} browser - La instancia del navegador.
- * @param {number} startPage - La página de inicio del scraping.
- * @param {number} endPage - La página final del scraping.
  */
 async function scrapeRemax(browser, startPage = 0, endPage) {
-    if (!browser) {
-        throw new Error('El navegador no está inicializado.');
+    if (!browser || !browser.isConnected()) { // Verificación extra
+        throw new Error('El navegador no está inicializado o se ha desconectado.');
     }
 
     let allProperties = [];
@@ -96,6 +91,7 @@ async function scrapeRemax(browser, startPage = 0, endPage) {
     });
 
     try {
+        // ... (el resto de la función es igual)
         for (let currentPage = startPage; currentPage <= endPage; currentPage++) {
             console.log(`Scraping página: ${currentPage}`);
             const url = `https://www.remax.com.ar/listings/buy?page=${currentPage}&pageSize=24&sort=-createdAt&in:operationId=1&in:eStageId=0,1,2,3,4&locations=in:CB@C%C3%B3rdoba::::::&landingPath=&filterCount=0&viewMode=mapViewMode`;
@@ -106,7 +102,7 @@ async function scrapeRemax(browser, startPage = 0, endPage) {
             try {
                 await page.waitForSelector(propertyListSelector, { state: 'visible', timeout: 30000 });
             } catch (error) {
-                console.warn(`No se encontró lista de propiedades en página ${currentPage}. Es posible que no haya más propiedades.`);
+                console.warn(`No se encontró lista de propiedades en página ${currentPage}.`);
                 break;
             }
 
@@ -141,8 +137,9 @@ async function scrapeRemax(browser, startPage = 0, endPage) {
         console.error(`Error durante el scraping del lote ${startPage}-${endPage}:`, error);
         return allProperties;
     } finally {
+        // ASEGÚRATE DE QUE ESTA PARTE SEA EXACTAMENTE ASÍ
         try {
-            await page.close();
+            await page.close(); // DEBE SER page.close()
             console.log(`Página para el lote ${startPage}-${endPage} cerrada.`);
         } catch (closeError) {
             console.error(`Error al cerrar la página del lote ${startPage}-${endPage} (ignorado):`, closeError.message);
