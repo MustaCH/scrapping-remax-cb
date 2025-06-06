@@ -1,11 +1,13 @@
-const { chromium } = require('playwright'); 
+const { chromium } = require('playwright');
 
-async function scrapeRemax(pageNumber = 0, endPage) {
-    let allProperties = [];
-    let browser;
-
+/**
+ * Inicia y devuelve una única instancia del navegador Chromium.
+ * Esta función se debe llamar solo una vez al iniciar el servidor.
+ */
+async function initializeBrowser() {
+    console.log('Iniciando instancia del navegador Chromium...');
     try {
-        browser = await chromium.launch({ 
+        const browser = await chromium.launch({
             headless: true,
             args: [
                 '--no-sandbox',
@@ -15,76 +17,107 @@ async function scrapeRemax(pageNumber = 0, endPage) {
                 '--no-first-run',
                 '--no-zygote',
                 '--disable-gpu',
-                '--single-process' 
-            ] }); 
-
-        const page = await browser.newPage({
-            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
+                '--single-process'
+            ]
         });
+        console.log('✅ Navegador Chromium iniciado correctamente.');
+        return browser;
+    } catch (error) {
+        console.error('❌ Error al iniciar el navegador:', error);
+        return null;
+    }
+}
 
-        let maxPages = endPage; 
-        if (!endPage) { 
-            console.log('Intentando determinar el número total de páginas...');
-            const firstPageUrl = `https://www.remax.com.ar/listings/buy?page=0&pageSize=24&sort=-createdAt&in:operationId=1&in:eStageId=0,1,2,3,4&locations=in:CB@C%C3%B3rdoba::::::&landingPath=&filterCount=0&viewMode=mapViewMode`;
-            await page.goto(firstPageUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+/**
+ * Obtiene el número máximo de páginas de propiedades.
+ * Reutiliza la instancia principal del navegador.
+ * @param {import('playwright').Browser} browser - La instancia del navegador.
+ */
+async function getMaxPages(browser) {
+    if (!browser) {
+        throw new Error('El navegador no está inicializado.');
+    }
 
-           
-            const totalPagesInfoSelector = '.p-container-paginator p'; 
-            
+    const page = await browser.newPage({
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
+    });
 
-            try {
-                await page.waitForSelector(totalPagesInfoSelector, { state: 'attached', timeout: 15000 });
-                const fullPaginationText = await page.$eval(totalPagesInfoSelector, el => el.textContent);
-                
-                const match = fullPaginationText.match(/de (\d+)/);
-                
-                if (match && match[1]) {
-                    const parsedTotalPages = parseInt(match[1]);
-                    if (!isNaN(parsedTotalPages) && parsedTotalPages > 0) {
-                        maxPages = parsedTotalPages;
-                        console.log(`Número total de páginas detectado: ${maxPages}`);
-                    } else {
-                        console.warn('No se pudo parsear el número total de páginas del texto. Usando un límite por defecto.');
-                        maxPages = 175;
-                    }
-                } else {
-                    console.warn('El formato del texto de paginación no coincide. Usando un límite por defecto.');
-                    maxPages = 175; 
-                }
+    console.log('Obteniendo el número total de páginas...');
 
-            } catch (err) {
-                console.warn(`No se encontró el selector de información de paginación o hubo un error: ${err.message}. Usando un límite por defecto.`);
-                maxPages = 175;
+    try {
+        const firstPageUrl = `https://www.remax.com.ar/listings/buy?page=0&pageSize=24&sort=-createdAt&in:operationId=1&in:eStageId=0,1,2,3,4&locations=in:CB@C%C3%B3rdoba::::::&landingPath=&filterCount=0&viewMode=mapViewMode`;
+        await page.goto(firstPageUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+
+        const totalPagesInfoSelector = '.p-container-paginator p';
+        await page.waitForSelector(totalPagesInfoSelector, { state: 'attached', timeout: 15000 });
+
+        const fullPaginationText = await page.$eval(totalPagesInfoSelector, el => el.textContent);
+        const match = fullPaginationText.match(/de (\d+)/);
+
+        if (match && match[1]) {
+            const parsedTotalPages = parseInt(match[1]);
+            if (!isNaN(parsedTotalPages) && parsedTotalPages > 0) {
+                console.log(`Número total de páginas detectado: ${parsedTotalPages}`);
+                return parsedTotalPages;
             }
         }
 
-        for (let currentPage = pageNumber; currentPage <= maxPages; currentPage++) {
-            console.log(`Scraping page: ${currentPage}`);
+        console.warn('No se pudo parsear el número total de páginas. Usando fallback: 175.');
+        return 175;
+
+    } catch (err) {
+        console.warn(`Error obteniendo paginación: ${err.message}. Usando fallback: 175.`);
+        return 175;
+    } finally {
+        await page.close(); // Cierra solo la página, no el navegador
+        console.log('Página para obtener maxPages cerrada.');
+    }
+}
+
+
+/**
+ * Scrapea un rango de páginas de propiedades.
+ * @param {import('playwright').Browser} browser - La instancia del navegador.
+ * @param {number} startPage - La página de inicio del scraping.
+ * @param {number} endPage - La página final del scraping.
+ */
+async function scrapeRemax(browser, startPage = 0, endPage) {
+    if (!browser) {
+        throw new Error('El navegador no está inicializado.');
+    }
+
+    let allProperties = [];
+    const page = await browser.newPage({
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
+    });
+
+    try {
+        for (let currentPage = startPage; currentPage <= endPage; currentPage++) {
+            console.log(`Scraping página: ${currentPage}`);
             const url = `https://www.remax.com.ar/listings/buy?page=${currentPage}&pageSize=24&sort=-createdAt&in:operationId=1&in:eStageId=0,1,2,3,4&locations=in:CB@C%C3%B3rdoba::::::&landingPath=&filterCount=0&viewMode=mapViewMode`;
 
-            await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 }); 
+            await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
 
-            const propertyListSelector = '#card-map'; 
+            const propertyListSelector = '#card-map';
             try {
                 await page.waitForSelector(propertyListSelector, { state: 'visible', timeout: 30000 });
             } catch (error) {
-                console.warn(`No se encontró el selector de lista de propiedades en la página ${currentPage}. Es posible que no haya más propiedades o que el selector sea incorrecto.`, error.message);
-                break; 
+                console.warn(`No se encontró lista de propiedades en página ${currentPage}. Es posible que no haya más propiedades.`);
+                break;
             }
 
             const pageProperties = await page.evaluate(() => {
                 const properties = [];
                 document.querySelectorAll('qr-card-property').forEach(card => {
-                    const titleElement = card.querySelector('.card__description-and-brokers'); 
+                    const titleElement = card.querySelector('.card__description-and-brokers');
                     const priceElement = card.querySelector('.card__price-and-expenses');
                     const featureElement = card.querySelector('.card__feature');
-                    const urlElement = card.querySelector('.card-remax__href'); 
+                    const urlElement = card.querySelector('.card-remax__href');
                     if (titleElement && urlElement) {
-                       
                         properties.push({
                             title: titleElement.textContent.trim(),
-                            price: priceElement.textContent.trim() || 'No disponible',
-                            features: featureElement.textContent.trim() || 'No disponible',
+                            price: priceElement ? priceElement.textContent.trim() : 'No disponible',
+                            features: featureElement ? featureElement.textContent.trim() : 'No disponible',
                             url: urlElement.href,
                         });
                     }
@@ -93,90 +126,26 @@ async function scrapeRemax(pageNumber = 0, endPage) {
             });
 
             if (pageProperties.length === 0) {
-                console.log(`No se encontraron propiedades en la página ${currentPage}. Fin del scraping.`);
-                break; 
+                console.log(`No se encontraron propiedades en la página ${currentPage}. Finalizando este lote.`);
+                break;
             }
 
             allProperties = allProperties.concat(pageProperties);
 
-            await page.waitForTimeout(1000);
+            // Una pequeña pausa para no saturar el servidor de Remax
+            await page.waitForTimeout(500);
         }
-
     } catch (error) {
-        console.error('Error durante el scraping:', error);
+        console.error(`Error durante el scraping del lote ${startPage}-${endPage}:`, error);
+        // Devuelve lo que se haya conseguido hasta ahora
+        return allProperties;
     } finally {
-        if (browser) {
-            await browser.close();
-        }
+        await page.close(); // Cierra la página al terminar el lote
+        console.log(`Página para el lote ${startPage}-${endPage} cerrada.`);
     }
+
     return allProperties;
 }
 
-//getMaxPages.js
-// Esta función obtiene el número máximo de páginas disponibles en el sitio web de RE/MAX
 
-async function getMaxPages() {
-    let browser;
-    
-    try {
-        browser = await chromium.launch({ 
-            headless: true,
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-accelerated-2d-canvas',
-                '--no-first-run',
-                '--no-zygote',
-                '--disable-gpu',
-                '--single-process' 
-            ] 
-        }); 
-
-        const page = await browser.newPage({
-            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
-        });
-
-        console.log('Obteniendo número total de páginas...');
-        const firstPageUrl = `https://www.remax.com.ar/listings/buy?page=0&pageSize=24&sort=-createdAt&in:operationId=1&in:eStageId=0,1,2,3,4&locations=in:CB@C%C3%B3rdoba::::::&landingPath=&filterCount=0&viewMode=mapViewMode`;
-        
-        await page.goto(firstPageUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
-
-        const totalPagesInfoSelector = '.p-container-paginator p';
-        
-        try {
-            await page.waitForSelector(totalPagesInfoSelector, { state: 'attached', timeout: 15000 });
-            const fullPaginationText = await page.$eval(totalPagesInfoSelector, el => el.textContent);
-            
-            const match = fullPaginationText.match(/de (\d+)/);
-            
-            if (match && match[1]) {
-                const parsedTotalPages = parseInt(match[1]);
-                if (!isNaN(parsedTotalPages) && parsedTotalPages > 0) {
-                    console.log(`Número total de páginas detectado: ${parsedTotalPages}`);
-                    return parsedTotalPages;
-                } else {
-                    console.warn('No se pudo parsear el número total de páginas. Usando fallback.');
-                    return 175;
-                }
-            } else {
-                console.warn('Formato de paginación no reconocido. Usando fallback.');
-                return 175; 
-            }
-
-        } catch (err) {
-            console.warn(`Error obteniendo paginación: ${err.message}. Usando fallback.`);
-            return 175;
-        }
-
-    } catch (error) {
-        console.error('Error obteniendo maxPages:', error);
-        throw error;
-    } finally {
-        if (browser) {
-            await browser.close();
-        }
-    }
-}
-
-module.exports = { scrapeRemax, getMaxPages };
+module.exports = { initializeBrowser, getMaxPages, scrapeRemax };
