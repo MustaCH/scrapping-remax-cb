@@ -58,6 +58,13 @@ async function scrapeRemax(startPage = 0, endPage) {
             const url = `https://www.remax.com.ar/listings/buy?page=${currentPage}&pageSize=24&sort=-createdAt&in:operationId=1&in:eStageId=0,1,2,3,4&locations=in:CB@C%C3%B3rdoba::::::&landingPath=&filterCount=0&viewMode=mapViewMode`;
             await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 90000 });
             
+            // ✅ LÍNEA REINTRODUCIDA Y CRUCIAL
+            // Espera a que el contenedor de las tarjetas (#card-map) esté visible.
+            console.log('Esperando a que el contenedor de propiedades aparezca...');
+            const propertyListSelector = '#card-map';
+            await page.waitForSelector(propertyListSelector, { state: 'visible', timeout: 30000 });
+            console.log('✅ Contenedor de propiedades encontrado. Extrayendo datos...');
+
             const pageProperties = await page.evaluate(() => {
                 const properties = [];
                 document.querySelectorAll('qr-card-property').forEach(card => {
@@ -77,7 +84,11 @@ async function scrapeRemax(startPage = 0, endPage) {
                 return properties;
             });
 
-            if (pageProperties.length === 0) break;
+            if (pageProperties.length === 0) {
+                console.log(`No se encontraron propiedades en la página ${currentPage}. Es posible que la página esté vacía.`);
+                break;
+            }
+            console.log(`Se encontraron ${pageProperties.length} propiedades en esta página.`);
             allProperties = allProperties.concat(pageProperties);
             await page.waitForTimeout(500);
         }
