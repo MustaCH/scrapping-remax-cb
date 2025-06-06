@@ -69,8 +69,12 @@ async function getMaxPages(browser) {
         console.warn(`Error obteniendo paginación: ${err.message}. Usando fallback: 175.`);
         return 175;
     } finally {
-        await page.close(); // Cierra solo la página, no el navegador
-        console.log('Página para obtener maxPages cerrada.');
+        try {
+            await page.close(); // Cierra solo la página, no el navegador
+            console.log('Página para obtener maxPages cerrada.');
+        } catch (closeError) {
+            console.error('Error al cerrar la página de getMaxPages (ignorado):', closeError.message);
+        }
     }
 }
 
@@ -140,12 +144,15 @@ async function scrapeRemax(browser, startPage = 0, endPage) {
         // Devuelve lo que se haya conseguido hasta ahora
         return allProperties;
     } finally {
-        await page.close(); // Cierra la página al terminar el lote
-        console.log(`Página para el lote ${startPage}-${endPage} cerrada.`);
+        try {
+            await page.close(); // Cierra la página al terminar el lote
+            console.log(`Página para el lote ${startPage}-${endPage} cerrada.`);
+        } catch (closeError) {
+            console.error(`Error al cerrar la página del lote ${startPage}-${endPage} (ignorado):`, closeError.message);
+        }
     }
 
     return allProperties;
 }
-
 
 module.exports = { initializeBrowser, getMaxPages, scrapeRemax };
