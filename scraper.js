@@ -1,49 +1,27 @@
 const { chromium } = require('playwright');
 
-/**
- * Inicia y devuelve una única instancia del navegador Chromium.
- */
-async function initializeBrowser() {
-    console.log('Iniciando instancia del navegador Chromium...');
+const launchOptions = {
+    args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--no-first-run',
+        '--no-zygote',
+        '--disable-gpu',
+        '--single-process'
+    ]
+};
+
+async function getMaxPages() {
+    let browser;
+    console.log('getMaxPages: Iniciando navegador efímero...');
     try {
-        const browser = await chromium.launch({
-            // Usamos el modo por defecto de Playwright que es el nuevo modo headless
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-accelerated-2d-canvas',
-                '--no-first-run',
-                '--no-zygote',
-                '--disable-gpu',
-                '--single-process'
-            ]
-        });
-        console.log('✅ Navegador Chromium iniciado correctamente.');
-        return browser;
-    } catch (error) {
-        console.error('❌ Error al iniciar el navegador:', error);
-        return null;
-    }
-}
-
-/**
- * Obtiene el número máximo de páginas de propiedades.
- */
-async function getMaxPages(browser) {
-    if (!browser || !browser.isConnected()) { // Verificación extra
-        throw new Error('El navegador no está inicializado o se ha desconectado.');
-    }
-
-    const page = await browser.newPage({
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
-    });
-
-    console.log('Obteniendo el número total de páginas...');
-
-    try {
+        browser = await chromium.launch(launchOptions);
+        const page = await browser.newPage({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36' });
+        
         const firstPageUrl = `https://www.remax.com.ar/listings/buy?page=0&pageSize=24&sort=-createdAt&in:operationId=1&in:eStageId=0,1,2,3,4&locations=in:CB@C%C3%B3rdoba::::::&landingPath=&filterCount=0&viewMode=mapViewMode`;
-        await page.goto(firstPageUrl, { waitUntil: 'domcontentloaded', timeout: 90000 }); 
+        await page.goto(firstPageUrl, { waitUntil: 'domcontentloaded', timeout: 90000 });
 
         const totalPagesInfoSelector = '.p-container-paginator p';
         await page.waitForSelector(totalPagesInfoSelector, { state: 'attached', timeout: 20000 });
@@ -53,59 +31,33 @@ async function getMaxPages(browser) {
 
         if (match && match[1]) {
             const parsedTotalPages = parseInt(match[1]);
-            if (!isNaN(parsedTotalPages) && parsedTotalPages > 0) {
-                console.log(`Número total de páginas detectado: ${parsedTotalPages}`);
-                return parsedTotalPages;
-            }
+            if (!isNaN(parsedTotalPages) && parsedTotalPages > 0) return parsedTotalPages;
         }
-        
-        console.warn('No se pudo parsear el número total de páginas. Usando fallback: 175.');
         return 175;
-
     } catch (err) {
-        console.warn(`Error obteniendo paginación: ${err.message}. Usando fallback: 175.`);
+        console.warn(`Error en getMaxPages: ${err.message}. Usando fallback.`);
         return 175;
     } finally {
-        // ASEGÚRATE DE QUE ESTA PARTE SEA EXACTAMENTE ASÍ
-        try {
-            await page.close(); // DEBE SER page.close()
-            console.log('Página para obtener maxPages cerrada.');
-        } catch (closeError) {
-            console.error('Error al cerrar la página de getMaxPages (ignorado):', closeError.message);
+        if (browser) {
+            await browser.close();
+            console.log('getMaxPages: Navegador efímero cerrado.');
         }
     }
 }
 
-
-/**
- * Scrapea un rango de páginas de propiedades.
- */
-async function scrapeRemax(browser, startPage = 0, endPage) {
-    if (!browser || !browser.isConnected()) { // Verificación extra
-        throw new Error('El navegador no está inicializado o se ha desconectado.');
-    }
-
-    let allProperties = [];
-    const page = await browser.newPage({
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
-    });
-
+async function scrapeRemax(startPage = 0, endPage) {
+    let browser;
+    console.log(`scrapeRemax: Iniciando navegador efímero para lote ${startPage}-${endPage}...`);
     try {
-        // ... (el resto de la función es igual)
+        browser = await chromium.launch(launchOptions);
+        const page = await browser.newPage({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36' });
+        
+        let allProperties = [];
         for (let currentPage = startPage; currentPage <= endPage; currentPage++) {
             console.log(`Scraping página: ${currentPage}`);
             const url = `https://www.remax.com.ar/listings/buy?page=${currentPage}&pageSize=24&sort=-createdAt&in:operationId=1&in:eStageId=0,1,2,3,4&locations=in:CB@C%C3%B3rdoba::::::&landingPath=&filterCount=0&viewMode=mapViewMode`;
-
             await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 90000 });
-
-            const propertyListSelector = '#card-map';
-            try {
-                await page.waitForSelector(propertyListSelector, { state: 'visible', timeout: 30000 });
-            } catch (error) {
-                console.warn(`No se encontró lista de propiedades en página ${currentPage}.`);
-                break;
-            }
-
+            
             const pageProperties = await page.evaluate(() => {
                 const properties = [];
                 document.querySelectorAll('qr-card-property').forEach(card => {
@@ -125,28 +77,20 @@ async function scrapeRemax(browser, startPage = 0, endPage) {
                 return properties;
             });
 
-            if (pageProperties.length === 0) {
-                console.log(`No se encontraron propiedades en la página ${currentPage}. Finalizando este lote.`);
-                break;
-            }
-
+            if (pageProperties.length === 0) break;
             allProperties = allProperties.concat(pageProperties);
             await page.waitForTimeout(500);
         }
-    } catch (error) {
-        console.error(`Error durante el scraping del lote ${startPage}-${endPage}:`, error);
         return allProperties;
+    } catch (error) {
+        console.error(`Error en scrapeRemax para lote ${startPage}-${endPage}:`, error);
+        throw error; // Lanzamos el error para que la ruta principal lo capture
     } finally {
-        // ASEGÚRATE DE QUE ESTA PARTE SEA EXACTAMENTE ASÍ
-        try {
-            await page.close(); // DEBE SER page.close()
-            console.log(`Página para el lote ${startPage}-${endPage} cerrada.`);
-        } catch (closeError) {
-            console.error(`Error al cerrar la página del lote ${startPage}-${endPage} (ignorado):`, closeError.message);
+        if (browser) {
+            await browser.close();
+            console.log(`scrapeRemax: Navegador efímero para lote ${startPage}-${endPage} cerrado.`);
         }
     }
-
-    return allProperties;
 }
 
-module.exports = { initializeBrowser, getMaxPages, scrapeRemax };
+module.exports = { getMaxPages, scrapeRemax };
