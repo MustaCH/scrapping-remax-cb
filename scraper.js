@@ -69,15 +69,29 @@ async function scrapeRemax(startPage = 0, endPage) {
                 const pageProperties = await page.evaluate(() => {
                     const properties = [];
                     document.querySelectorAll('qr-card-property').forEach(card => {
-                        const titleElement = card.querySelector('.card__description-and-brokers');
+                        const titleElement = card.querySelector('.card__description');
                         const priceElement = card.querySelector('.card__price-and-expenses');
-                        const featureElement = card.querySelector('.card__feature');
+                        const addressElement = card.querySelector('.card__address');
+                        const brokersElement = card.querySelector('.card__brokers');
+                        const contactPersonElement = card.querySelector('.contact-person__info--name');
+                        const officeElement = card.querySelector('.contact-person__info--office');
+                        const dimensionsLandElement = card.querySelector('.dimensionLand');
+                        const m2TotalElement = card.querySelector('.card__feature--item .feature--m2total');
+                        const m2CoverElement = card.querySelector('.card__feature--item .feature--m2cover');
+                        const ambientesElement = card.querySelector('.card__feature--item .feature--ambientes');
                         const urlElement = card.querySelector('.card-remax__href');
                         if (titleElement && urlElement) {
                             properties.push({
                                 title: titleElement.textContent.trim(),
                                 price: priceElement ? priceElement.textContent.trim() : 'No disponible',
-                                features: featureElement ? featureElement.textContent.trim() : 'No disponible',
+                                address: addressElement ? addressElement.textContent.trim() : 'No disponible',
+                                brokers: brokersElement ? brokersElement.textContent.trim() : 'No disponible',
+                                contactPerson: contactPersonElement ? contactPersonElement.textContent.trim() : 'No disponible',
+                                office: officeElement ? officeElement.textContent.trim() : 'No disponible',
+                                dimensionsLand: dimensionsLandElement ? dimensionsLandElement.textContent.trim() : 'No disponible',
+                                m2Total: m2TotalElement ? m2TotalElement.textContent.trim() : 'No disponible',
+                                m2Cover: m2CoverElement ? m2CoverElement.textContent.trim() : 'No disponible',
+                                ambientes: ambientesElement ? ambientesElement.textContent.trim() : 'No disponible',
                                 url: urlElement.href,
                             });
                         }
