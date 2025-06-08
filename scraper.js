@@ -55,7 +55,6 @@ async function scrapeRemax(startPage = 0, endPage) {
         let allProperties = [];
         for (let currentPage = startPage; currentPage <= endPage; currentPage++) {
             
-            // ✅ EL TRY...CATCH AHORA ENVUELVE CADA PÁGINA INDIVIDUALMENTE
             try {
                 console.log(`Procesando página: ${currentPage}`);
                 const url = `https://www.remax.com.ar/listings/buy?page=${currentPage}&pageSize=24&sort=-createdAt&in:operationId=1&in:eStageId=0,1,2,3,4&locations=in:CB@C%C3%B3rdoba::::::&landingPath=&filterCount=0&viewMode=mapViewMode`;
@@ -76,10 +75,10 @@ async function scrapeRemax(startPage = 0, endPage) {
                         const contactPersonElement = card.querySelector('.contact-person__info--name');
                         const officeElement = card.querySelector('.contact-person__info--office');
                         const dimensionsLandElement = card.querySelector('[data-info="dimensionLand"] p');
-                        const m2TotalElement = card.querySelector('.card__feature--item.feature--m2total');
-                        const m2CoverElement = card.querySelector('.card__feature--item.feature--m2cover');
-                        const ambientesElement = card.querySelector('.card__feature--item.feature--ambientes');
-                        const bathroomsElement = card.querySelector('.card__feature--item.feature--bathroom');
+                        const m2TotalElement = card.querySelector('.feature--m2total p');
+                        const m2CoverElement = card.querySelector('.feature--m2cover p');
+                        const ambientesElement = card.querySelector('.feature--ambientes p');
+                        const bathroomsElement = card.querySelector('.feature--bathroom p');
                         const urlElement = card.querySelector('.card-remax__href');
                         if (titleElement && urlElement) {
                             properties.push({
@@ -110,14 +109,12 @@ async function scrapeRemax(startPage = 0, endPage) {
                 allProperties = allProperties.concat(pageProperties);
 
             } catch (pageError) {
-                // Si una página falla, lo registramos y continuamos con la siguiente
                 console.warn(`⚠️ Error al procesar la página ${currentPage}: ${pageError.message}. Continuando con la siguiente...`);
                 continue;
             }
         }
         return allProperties;
     } catch (error) {
-        // Este catch ahora solo se activará si falla el inicio del navegador
         console.error(`Error fatal en scrapeRemax para lote ${startPage}-${endPage}:`, error);
         throw error;
     } finally {
