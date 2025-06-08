@@ -75,11 +75,7 @@ async function scrapeRemax(startPage = 0, endPage) {
                         const brokersElement = card.querySelector('.card__brokers');
                         const contactPersonElement = card.querySelector('.contact-person__info--name');
                         const officeElement = card.querySelector('.contact-person__info--office');
-                        const dimensionsLandElement = card.querySelector('[data-info="dimensionLand"] p');
-                        const m2TotalElement = card.querySelector('.card__feature--item.feature--m2total');
-                        const m2CoverElement = card.querySelector('.card__feature--item.feature--m2cover');
-                        const ambientesElement = card.querySelector('.card__feature--item.feature--ambientes');
-                        const bathroomsElement = card.querySelector('.card__feature--item.feature--bathroom');
+                        const featuresElement = card.querySelector('.card__features');
                         const urlElement = card.querySelector('.card-remax__href');
                         if (titleElement && urlElement) {
                             properties.push({
@@ -89,11 +85,7 @@ async function scrapeRemax(startPage = 0, endPage) {
                                 brokers: brokersElement ? brokersElement.textContent.trim() : 'No disponible',
                                 contactPerson: contactPersonElement ? contactPersonElement.textContent.trim() : 'No disponible',
                                 office: officeElement ? officeElement.textContent.trim() : 'No disponible',
-                                dimensionsLand: dimensionsLandElement ? dimensionsLandElement.textContent.trim() : 'No disponible',
-                                m2Total: m2TotalElement ? m2TotalElement.textContent.trim() : 'No disponible',
-                                m2Cover: m2CoverElement ? m2CoverElement.textContent.trim() : 'No disponible',
-                                ambientes: ambientesElement ? ambientesElement.textContent.trim() : 'No disponible',
-                                baños: bathroomsElement ? bathroomsElement.textContent.trim() : 'No disponible',
+                                features: featuresElement ? featuresElement.textContent.trim() : 'No disponible',
                                 url: urlElement.href,
                             });
                         }
