@@ -79,6 +79,7 @@ async function scrapeRemax(startPage = 0, endPage) {
                         const m2TotalElement = card.querySelector('.card__feature--item .feature--m2total');
                         const m2CoverElement = card.querySelector('.card__feature--item .feature--m2cover');
                         const ambientesElement = card.querySelector('.card__feature--item .feature--ambientes');
+                        const bathroomsElement = card.querySelector('.card__feature--item feature--bathroom');
                         const urlElement = card.querySelector('.card-remax__href');
                         if (titleElement && urlElement) {
                             properties.push({
@@ -92,6 +93,7 @@ async function scrapeRemax(startPage = 0, endPage) {
                                 m2Total: m2TotalElement ? m2TotalElement.textContent.trim() : 'No disponible',
                                 m2Cover: m2CoverElement ? m2CoverElement.textContent.trim() : 'No disponible',
                                 ambientes: ambientesElement ? ambientesElement.textContent.trim() : 'No disponible',
+                                baños: bathroomsElement ? bathroomsElement.textContent.trim() : 'No disponible',
                                 url: urlElement.href,
                             });
                         }
