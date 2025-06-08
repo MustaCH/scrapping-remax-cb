@@ -76,10 +76,10 @@ async function scrapeRemax(startPage = 0, endPage) {
                         const contactPersonElement = card.querySelector('.contact-person__info--name');
                         const officeElement = card.querySelector('.contact-person__info--office');
                         const dimensionsLandElement = card.querySelector('[data-info="dimensionLand"] p');
-                        const m2TotalElement = card.querySelector('.card__feature--item.feature--m2total p');
-                        const m2CoverElement = card.querySelector('.card__feature--item.feature--m2cover p');
-                        const ambientesElement = card.querySelector('.card__feature--item.feature--ambientes p');
-                        const bathroomsElement = card.querySelector('.card__feature--item.feature--bathroom p');
+                        const m2TotalElement = card.querySelector('.card__feature--item.feature--m2total');
+                        const m2CoverElement = card.querySelector('.card__feature--item.feature--m2cover');
+                        const ambientesElement = card.querySelector('.card__feature--item.feature--ambientes');
+                        const bathroomsElement = card.querySelector('.card__feature--item.feature--bathroom');
                         const urlElement = card.querySelector('.card-remax__href');
                         if (titleElement && urlElement) {
                             properties.push({
