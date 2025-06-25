@@ -102,7 +102,7 @@ async function scrapeRemax(startPage = 0, endPage) {
                     locality: prop.geoLabel, 
                     latitude: prop.location?.coordinates?.[1] ?? 'No disponible', 
                     longitude: prop.location?.coordinates?.[0] ?? 'No disponible', 
-                    brokers: prop.listBroker.map(b => `${b.name} ${b.license}`).join(', '),
+                    brokers: prop.listBroker?.map(b => `${b.name} ${b.license}`).join(', ') ?? 'No disponible',
                     contactPerson: prop.associate.name,
                     office: prop.associate.officeName,
                     dimensionsLand: `${prop.dimensionLand} m²`,
