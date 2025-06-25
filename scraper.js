@@ -90,13 +90,18 @@ async function scrapeRemax(startPage = 0, endPage) {
                 }
                 
                 // Mapeamos los datos del JSON a la estructura que queremos
-                const pageProperties = propertiesData.map(prop => ({
+                const pageProperties = propertiesData.map(prop => {
+                    const price = prop.price ?? 0;
+                    const currency = prop.currency?.value ?? ''; // Si prop.currency no existe, currency será ''
+                    const formattedPrice = (price > 0 && currency) ? `${price} ${currency}` : 'Consultar';
+
+                    return {
                     title: prop.title,
-                    price: `${prop.price} ${prop.currency.value}`,
+                    price: formattedPrice,
                     address: prop.displayAddress,
-                    locality: prop.geoLabel, // ¡Aquí está la localidad!
-                    latitude: prop.location.coordinates[1], // ¡Y aquí la latitud!
-                    longitude: prop.location.coordinates[0], // ¡Y la longitud!
+                    locality: prop.geoLabel, 
+                    latitude: prop.location.coordinates[1], 
+                    longitude: prop.location.coordinates[0], 
                     brokers: prop.listBroker.map(b => `${b.name} ${b.license}`).join(', '),
                     contactPerson: prop.associate.name,
                     office: prop.associate.officeName,
@@ -107,7 +112,8 @@ async function scrapeRemax(startPage = 0, endPage) {
                     baños: prop.bathrooms > 0 ? `${prop.bathrooms} baños` : 'No disponible',
                     url: `https://www.remax.com.ar/listings/${prop.slug}`,
                     internalId: prop.internalId
-                }));
+                    }
+                });
 
                 console.log(`  -> Se encontraron ${pageProperties.length} propiedades.`);
                 allProperties = allProperties.concat(pageProperties);
