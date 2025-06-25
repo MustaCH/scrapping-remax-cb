@@ -13,6 +13,22 @@ const launchOptions = {
     ]
 };
 
+// Función para extraer el JSON del script ng-state
+const extractNgStateData = async (page) => {
+    const ngStateSelector = 'script#ng-state';
+    await page.waitForSelector(ngStateSelector, { state: 'attached', timeout: 30000 });
+    const ngStateContent = await page.$eval(ngStateSelector, el => el.textContent);
+    
+    const jsonData = JSON.parse(ngStateContent);
+    // Buscamos la clave que contiene la data principal. Usualmente es la primera.
+    const mainDataKey = Object.keys(jsonData).find(key => jsonData[key]?.b?.data?.data);
+    if (!mainDataKey) {
+        throw new Error('No se encontró la clave de datos principal en ng-state');
+    }
+    return jsonData[mainDataKey].b.data;
+};
+
+
 async function getMaxPages() {
     let browser;
     console.log('getMaxPages: Iniciando navegador efímero...');
@@ -20,23 +36,24 @@ async function getMaxPages() {
         browser = await chromium.launch(launchOptions);
         const page = await browser.newPage({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36' });
         
-        const firstPageUrl = `https://www.remax.com.ar/listings/buy?page=0&pageSize=24&sort=-createdAt&in:operationId=1&in:eStageId=0,1,2,3,4&locations=in:CB@C%C3%B3rdoba::::::&landingPath=&filterCount=0&viewMode=mapViewMode`;
+        const firstPageUrl = `https://www.remax.com.ar/listings/buy?page=0&pageSize=24&sort=-createdAt&in:operationId=1&in:eStageId=0,1,2,3,4&locations=in:CB@C%C3%B3rdoba::::::`;
         await page.goto(firstPageUrl, { waitUntil: 'domcontentloaded', timeout: 90000 });
 
-        const totalPagesInfoSelector = '.p-container-paginator p';
-        await page.waitForSelector(totalPagesInfoSelector, { state: 'attached', timeout: 20000 });
+        // Extraemos los datos del JSON
+        const data = await extractNgStateData(page);
 
-        const fullPaginationText = await page.$eval(totalPagesInfoSelector, el => el.textContent);
-        const match = fullPaginationText.match(/de (\d+)/);
-
-        if (match && match[1]) {
-            const parsedTotalPages = parseInt(match[1]);
-            if (!isNaN(parsedTotalPages) && parsedTotalPages > 0) return parsedTotalPages;
+        if (data && data.totalPages) {
+            console.log(`Total de páginas encontrado en ng-state: ${data.totalPages}`);
+            return data.totalPages;
         }
+
+        // Fallback si no se encuentra
+        console.warn('No se pudo encontrar totalPages en ng-state, usando fallback.');
         return 175;
+
     } catch (err) {
         console.warn(`Error en getMaxPages: ${err.message}. Usando fallback.`);
-        return 175;
+        return 175; // Valor de fallback
     } finally {
         if (browser) {
             await browser.close();
@@ -47,7 +64,7 @@ async function getMaxPages() {
 
 async function scrapeRemax(startPage = 0, endPage) {
     let browser;
-    console.log(`scrapeRemax: Iniciando navegador efímero para lote ${startPage}-${endPage}...`);
+    console.log(`scrapeRemax: Iniciando navegador efímero para lote de páginas ${startPage} a ${endPage}...`);
     try {
         browser = await chromium.launch(launchOptions);
         const page = await browser.newPage({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36' });
@@ -57,54 +74,41 @@ async function scrapeRemax(startPage = 0, endPage) {
             
             try {
                 console.log(`Procesando página: ${currentPage}`);
-                const url = `https://www.remax.com.ar/listings/buy?page=${currentPage}&pageSize=24&sort=-createdAt&in:operationId=1&in:eStageId=0,1,2,3,4&locations=in:CB@C%C3%B3rdoba::::::&landingPath=&filterCount=0&viewMode=mapViewMode`;
+                // No es necesario el viewMode=mapViewMode, podemos usar la vista de lista normal.
+                const url = `https://www.remax.com.ar/listings/buy?page=${currentPage}&pageSize=24&sort=-createdAt&in:operationId=1&in:eStageId=0,1,2,3,4&locations=in:CB@C%C3%B3rdoba::::::`;
                 await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 90000 });
                 
-                console.log(`  -> Esperando a que el contenedor de propiedades aparezca...`);
-                const propertyListSelector = '#card-map';
-                await page.waitForSelector(propertyListSelector, { state: 'visible', timeout: 30000 });
-                console.log(`  -> ✅ Contenedor encontrado. Extrayendo datos...`);
+                console.log(`  -> Esperando a que el script ng-state aparezca...`);
+                
+                // Usamos la función auxiliar para obtener los datos del JSON
+                const apiData = await extractNgStateData(page);
+                const propertiesData = apiData.data;
 
-                const pageProperties = await page.evaluate(() => {
-                    const properties = [];
-                    document.querySelectorAll('qr-card-property').forEach(card => {
-                        const titleElement = card.querySelector('.card__description');
-                        const priceElement = card.querySelector('.card__price-and-expenses');
-                        const addressElement = card.querySelector('.card__address');
-                        const brokersElement = card.querySelector('.card__brokers');
-                        const contactPersonElement = card.querySelector('.contact-person__info--name');
-                        const officeElement = card.querySelector('.contact-person__info--office');
-                        const dimensionsLandElement = card.querySelector('[data-info="dimensionLand"] p');
-                        const m2TotalElement = card.querySelector('.feature--m2total p');
-                        const m2CoverElement = card.querySelector('.feature--m2cover p');
-                        const ambientesElement = card.querySelector('.feature--ambientes p');
-                        const bathroomsElement = card.querySelector('.feature--bathroom p');
-                        const urlElement = card.querySelector('.card-remax__href');
-                        if (titleElement && urlElement) {
-                            properties.push({
-                                title: titleElement.textContent.trim(),
-                                price: priceElement ? priceElement.textContent.trim() : 'No disponible',
-                                address: addressElement ? addressElement.textContent.trim() : 'No disponible',
-                                brokers: brokersElement ? brokersElement.textContent.trim() : 'No disponible',
-                                contactPerson: contactPersonElement ? contactPersonElement.textContent.trim() : 'No disponible',
-                                office: officeElement ? officeElement.textContent.trim() : 'No disponible',
-                                dimensionsLand: dimensionsLandElement ? dimensionsLandElement.textContent.trim() : 'No disponible',
-                                m2Total: m2TotalElement ? m2TotalElement.textContent.trim() : 'No disponible',
-                                m2Cover: m2CoverElement ? m2CoverElement.textContent.trim() : 'No disponible',
-                                ambientes: ambientesElement ? ambientesElement.textContent.trim() : 'No disponible',
-                                baños: bathroomsElement ? bathroomsElement.textContent.trim() : 'No disponible',
-                                url: urlElement.href,
-                            });
-                        }
-                    });
-                    return properties;
-                });
-
-                if (pageProperties.length === 0) {
+                if (!propertiesData || propertiesData.length === 0) {
                     console.log(`  -> No se encontraron propiedades en la página ${currentPage}. Finalizando el lote.`);
                     break; 
                 }
                 
+                // Mapeamos los datos del JSON a la estructura que queremos
+                const pageProperties = propertiesData.map(prop => ({
+                    title: prop.title,
+                    price: `${prop.price} ${prop.currency.value}`,
+                    address: prop.displayAddress,
+                    locality: prop.geoLabel, // ¡Aquí está la localidad!
+                    latitude: prop.location.coordinates[1], // ¡Y aquí la latitud!
+                    longitude: prop.location.coordinates[0], // ¡Y la longitud!
+                    brokers: prop.listBroker.map(b => `${b.name} ${b.license}`).join(', '),
+                    contactPerson: prop.associate.name,
+                    office: prop.associate.officeName,
+                    dimensionsLand: `${prop.dimensionLand} m²`,
+                    m2Total: `${prop.dimensionTotalBuilt} m²`,
+                    m2Cover: `${prop.dimensionCovered} m²`,
+                    ambientes: prop.totalRooms > 0 ? `${prop.totalRooms} ambientes` : 'No disponible',
+                    baños: prop.bathrooms > 0 ? `${prop.bathrooms} baños` : 'No disponible',
+                    url: `https://www.remax.com.ar/listings/${prop.slug}`,
+                    internalId: prop.internalId
+                }));
+
                 console.log(`  -> Se encontraron ${pageProperties.length} propiedades.`);
                 allProperties = allProperties.concat(pageProperties);
 
