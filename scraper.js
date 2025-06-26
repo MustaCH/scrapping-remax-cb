@@ -13,12 +13,6 @@ const launchOptions = {
     ]
 };
 
-await page.waitForFunction(() => {
-  const el = document.querySelector('script#ng-state');
-  if (!el) return false;
-  try { return JSON.parse(el.textContent).length > 2; }
-  catch { return false; }
-}, { timeout: 30000 });
 
 // Función para extraer el JSON del script ng-state
 const extractNgStateData = async (page) => {
