@@ -13,21 +13,23 @@ const launchOptions = {
     ]
 };
 
-// Función para extraer el JSON del script ng-state
-const extractNgStateData = async (page) => {
-    const ngStateSelector = 'script#ng-state';
-    await page.waitForSelector(ngStateSelector, { state: 'attached', timeout: 30000 });
-    const ngStateContent = await page.$eval(ngStateSelector, el => el.textContent);
-    
-    const jsonData = JSON.parse(ngStateContent);
-    // Buscamos la clave que contiene la data principal. Usualmente es la primera.
-    const mainDataKey = Object.keys(jsonData).find(key => jsonData[key]?.b?.data?.data);
-    if (!mainDataKey) {
-        throw new Error('No se encontró la clave de datos principal en ng-state');
-    }
-    return jsonData[mainDataKey].b.data;
-};
+// Función auxiliar para extraer datos de la respuesta de la API
+async function extractDataFromApiResponse(page, url) {
+    // Le decimos a Playwright que espere por una respuesta de la API específica
+    const responsePromise = page.waitForResponse(
+        response => response.url().includes('/api/listings/buy') && response.status() === 200,
+        { timeout: 30000 } // Timeout de 30 segundos
+    );
 
+    // Navegamos a la URL para disparar la llamada a la API
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 90000 });
+
+    // Esperamos a que la promesa de la respuesta se resuelva
+    const response = await responsePromise;
+    
+    // Convertimos el cuerpo de la respuesta a JSON
+    return response.json();
+}
 
 async function getMaxPages() {
     let browser;
@@ -37,23 +39,21 @@ async function getMaxPages() {
         const page = await browser.newPage({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36' });
         
         const firstPageUrl = `https://www.remax.com.ar/listings/buy?page=0&pageSize=24&sort=-createdAt&in:operationId=1&in:eStageId=0,1,2,3,4&locations=in:CB@C%C3%B3rdoba::::::`;
-        await page.goto(firstPageUrl, { waitUntil: 'domcontentloaded', timeout: 90000 });
+        
+        console.log('getMaxPages: Interceptando API para obtener el total de páginas...');
+        const apiData = await extractDataFromApiResponse(page, firstPageUrl);
 
-        // Extraemos los datos del JSON
-        const data = await extractNgStateData(page);
-
-        if (data && data.totalPages) {
-            console.log(`Total de páginas encontrado en ng-state: ${data.totalPages}`);
-            return data.totalPages;
+        if (apiData && apiData.totalPages) {
+            console.log(`Total de páginas encontrado en API: ${apiData.totalPages}`);
+            return apiData.totalPages;
         }
 
-        // Fallback si no se encuentra
-        console.warn('No se pudo encontrar totalPages en ng-state, usando fallback.');
+        console.warn('No se pudo encontrar totalPages en la API, usando fallback.');
         return 175;
 
     } catch (err) {
         console.warn(`Error en getMaxPages: ${err.message}. Usando fallback.`);
-        return 175; // Valor de fallback
+        return 175;
     } finally {
         if (browser) {
             await browser.close();
@@ -75,55 +75,44 @@ async function scrapeRemax(startPage = 0, endPage) {
             try {
                 console.log(`Procesando página: ${currentPage}`);
                 const url = `https://www.remax.com.ar/listings/buy?page=${currentPage}&pageSize=24&sort=-createdAt&in:operationId=1&in:eStageId=0,1,2,3,4&locations=in:CB@C%C3%B3rdoba::::::`;
-                await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 90000 });
-                
-                console.log(`  -> Esperando a que la lista de propiedades se popule completamente...`);
 
-                try {
-                    await page.waitForFunction(() => {
-                        return document.querySelectorAll('qr-card-property').length > 2;
-                    }, null, { timeout: 20000 }); 
-                    console.log('  -> ✅ Lista de propiedades populada.');
-                } catch (e) {
-                    const finalCount = await page.locator('qr-card-property').count();
-                    console.log(`  -> ⚠️  Timeout esperando la lista completa. Se encontraron solo ${finalCount} propiedades. Es posible que esta sea la última página. Continuando...`);
-                }
+                console.log(`  -> Navegando e interceptando la respuesta de la API...`);
+                const apiData = await extractDataFromApiResponse(page, url);
                 
-                console.log(`  -> Extrayendo datos del script ng-state...`);
-                const apiData = await extractNgStateData(page);
                 const propertiesData = apiData.data;
 
                 if (!propertiesData || propertiesData.length === 0) {
-                    console.log(`  -> No se encontraron propiedades en la página ${currentPage}. Finalizando el lote.`);
+                    console.log(`  -> No se encontraron propiedades en la API para la página ${currentPage}. Finalizando el lote.`);
                     break; 
                 }
                 
-                // Mapeamos los datos del JSON a la estructura que queremos
                 const pageProperties = propertiesData.map(prop => {
                     const price = prop.price ?? 0;
-                    const currency = prop.currency?.value ?? ''; // Si prop.currency no existe, currency será ''
+                    const currency = prop.currency?.value ?? '';
                     const formattedPrice = (price > 0 && currency) ? `${price} ${currency}` : 'Consultar';
+                    const tags = prop.features?.map(f => f.name).join(', ') ?? '';
 
                     return {
-                        title: prop.title,
+                        title: prop.title ?? 'Sin título',
                         price: formattedPrice,
-                        address: prop.displayAddress,
-                        locality: prop.geoLabel, 
-                        latitude: prop.location?.coordinates?.[1] ?? 'No disponible', 
-                        longitude: prop.location?.coordinates?.[0] ?? 'No disponible', 
+                        address: prop.displayAddress ?? 'No disponible',
+                        locality: prop.geoLabel ?? 'No disponible',
+                        latitude: prop.location?.coordinates?.[1] ?? null,
+                        longitude: prop.location?.coordinates?.[0] ?? null,
                         brokers: prop.listBroker?.map(b => `${b.name} ${b.license}`).join(', ') ?? 'No disponible',
                         contactPerson: prop.associate?.name ?? 'No disponible',
                         office: prop.associate?.officeName ?? 'No disponible',
-                        dimensionsLand: `${prop.dimensionLand} m²`,
-                        m2Total: `${prop.dimensionTotalBuilt} m²`,
-                        m2Cover: `${prop.dimensionCovered} m²`,
+                        dimensionsLand: `${prop.dimensionLand ?? 0} m²`,
+                        m2Total: `${prop.dimensionTotalBuilt ?? 0} m²`,
+                        m2Cover: `${prop.dimensionCovered ?? 0} m²`,
                         ambientes: prop.totalRooms > 0 ? `${prop.totalRooms} ambientes` : 'No disponible',
                         baños: prop.bathrooms > 0 ? `${prop.bathrooms} baños` : 'No disponible',
-                        url: `https://www.remax.com.ar/listings/${prop.slug}`
-                    }
+                        url: prop.slug ? `https://www.remax.com.ar/listings/${prop.slug}` : '#',
+                        internalId: prop.internalId ?? null
+                    };
                 });
 
-                console.log(`  -> Se encontraron ${pageProperties.length} propiedades.`);
+                console.log(`  -> Se encontraron ${pageProperties.length} propiedades en la API.`);
                 allProperties = allProperties.concat(pageProperties);
 
             } catch (pageError) {
