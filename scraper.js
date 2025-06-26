@@ -96,22 +96,26 @@ async function scrapeRemax(startPage = 0, endPage) {
                     const formattedPrice = (price > 0 && currency) ? `${price} ${currency}` : 'Consultar';
 
                     return {
-                    title: prop.title,
-                    price: formattedPrice,
-                    address: prop.displayAddress,
-                    locality: prop.geoLabel, 
-                    latitude: prop.location?.coordinates?.[1] ?? 'No disponible', 
-                    longitude: prop.location?.coordinates?.[0] ?? 'No disponible', 
-                    brokers: prop.listBroker?.map(b => `${b.name} ${b.license}`).join(', ') ?? 'No disponible',
-                    contactPerson: prop.associate?.name ?? 'No disponible',
-                    office: prop.associate?.officeName ?? 'No disponible',
-                    dimensionsLand: `${prop.dimensionLand} m²`,
-                    m2Total: `${prop.dimensionTotalBuilt} m²`,
-                    m2Cover: `${prop.dimensionCovered} m²`,
-                    ambientes: prop.totalRooms > 0 ? `${prop.totalRooms} ambientes` : 'No disponible',
-                    baños: prop.bathrooms > 0 ? `${prop.bathrooms} baños` : 'No disponible',
-                    url: `https://www.remax.com.ar/listings/${prop.slug}`,
-                    internalId: prop.internalId
+                        title: prop.title,
+                        price: formattedPrice,
+                        address: prop.displayAddress,
+                        locality: prop.geoLabel, 
+                        latitude: prop.location?.coordinates?.[1] ?? 'No disponible', 
+                        longitude: prop.location?.coordinates?.[0] ?? 'No disponible', 
+                        brokers: prop.listBroker?.map(b => `${b.name} ${b.license}`).join(', ') ?? 'No disponible',
+                        contactPerson: prop.associate?.name ?? 'No disponible',
+                        office: prop.associate?.officeName ?? 'No disponible',
+                        dimensionsLand: `${prop.dimensionLand} m²`,
+                        m2Total: `${prop.dimensionTotalBuilt} m²`,
+                        m2Cover: `${prop.dimensionCovered} m²`,
+                        ambientes: prop.totalRooms > 0 ? `${prop.totalRooms} ambientes` : 'No disponible',
+                        baños: prop.bathrooms > 0 ? `${prop.bathrooms} baños` : 'No disponible',
+                        url: `https://www.remax.com.ar/listings/${prop.slug}`,
+                        age: prop.age ?? null,
+                        propertyType: prop.propertyType?.value ?? 'No especificado',
+                        stage: prop.eStage?.value ?? 'No especificado',
+                        operationId: prop.operationId ?? null,
+                        tags: tags 
                     }
                 });
 
