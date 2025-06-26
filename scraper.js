@@ -13,27 +13,18 @@ const launchOptions = {
     ]
 };
 
-const extractNgStateData = async (page, expectedMin = 20) => {
+// Función para extraer el JSON del script ng-state
+const extractNgStateData = async (page) => {
     const ngStateSelector = 'script#ng-state';
-    await page.waitForSelector(ngStateSelector, { timeout: 30000 });
-
-    await page.waitForFunction((selector, expectedMin) => {
-        const el = document.querySelector(selector);
-        if (!el) return false;
-        try {
-            const json = JSON.parse(el.textContent);
-            const key = Object.keys(json).find(k => json[k]?.b?.data?.data);
-            const data = key ? json[key].b.data.data : [];
-            return Array.isArray(data) && data.length >= expectedMin;
-        } catch {
-            return false;
-        }
-    }, {}, ngStateSelector, expectedMin);
-
+    await page.waitForSelector(ngStateSelector, { state: 'attached', timeout: 30000 });
     const ngStateContent = await page.$eval(ngStateSelector, el => el.textContent);
+    
     const jsonData = JSON.parse(ngStateContent);
+    // Buscamos la clave que contiene la data principal. Usualmente es la primera.
     const mainDataKey = Object.keys(jsonData).find(key => jsonData[key]?.b?.data?.data);
-    if (!mainDataKey) throw new Error('No se encontró la clave de datos principal');
+    if (!mainDataKey) {
+        throw new Error('No se encontró la clave de datos principal en ng-state');
+    }
     return jsonData[mainDataKey].b.data;
 };
 
@@ -46,7 +37,7 @@ async function getMaxPages() {
         const page = await browser.newPage({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36' });
         
         const firstPageUrl = `https://www.remax.com.ar/listings/buy?page=0&pageSize=24&sort=-createdAt&in:operationId=1&in:eStageId=0,1,2,3,4&locations=in:CB@C%C3%B3rdoba::::::`;
-        await page.goto(firstPageUrl, { waitUntil: 'networkidle', timeout: 90000 });
+        await page.goto(firstPageUrl, { waitUntil: 'domcontentloaded', timeout: 90000 });
 
         // Extraemos los datos del JSON
         const data = await extractNgStateData(page);
@@ -84,7 +75,7 @@ async function scrapeRemax(startPage = 0, endPage) {
             try {
                 console.log(`Procesando página: ${currentPage}`);
                 const url = `https://www.remax.com.ar/listings/buy?page=${currentPage}&pageSize=24&sort=-createdAt&in:operationId=1&in:eStageId=0,1,2,3,4&locations=in:CB@C%C3%B3rdoba::::::`;
-                await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 90000 });
+                await page.goto(url, { waitUntil: 'networkidle', timeout: 90000 });
                 
                 console.log(`  -> Esperando a que la lista de propiedades se popule completamente...`);
 
