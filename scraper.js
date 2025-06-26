@@ -74,13 +74,22 @@ async function scrapeRemax(startPage = 0, endPage) {
             
             try {
                 console.log(`Procesando página: ${currentPage}`);
-                // No es necesario el viewMode=mapViewMode, podemos usar la vista de lista normal.
                 const url = `https://www.remax.com.ar/listings/buy?page=${currentPage}&pageSize=24&sort=-createdAt&in:operationId=1&in:eStageId=0,1,2,3,4&locations=in:CB@C%C3%B3rdoba::::::`;
                 await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 90000 });
                 
-                console.log(`  -> Esperando a que el script ng-state aparezca...`);
+                console.log(`  -> Esperando a que la lista de propiedades se popule completamente...`);
+
+                try {
+                    await page.waitForFunction(() => {
+                        return document.querySelectorAll('qr-card-property').length > 2;
+                    }, null, { timeout: 20000 }); 
+                    console.log('  -> ✅ Lista de propiedades populada.');
+                } catch (e) {
+                    const finalCount = await page.locator('qr-card-property').count();
+                    console.log(`  -> ⚠️  Timeout esperando la lista completa. Se encontraron solo ${finalCount} propiedades. Es posible que esta sea la última página. Continuando...`);
+                }
                 
-                // Usamos la función auxiliar para obtener los datos del JSON
+                console.log(`  -> Extrayendo datos del script ng-state...`);
                 const apiData = await extractNgStateData(page);
                 const propertiesData = apiData.data;
 
