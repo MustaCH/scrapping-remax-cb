@@ -13,6 +13,42 @@ const launchOptions = {
     ]
 };
 
+// Función para debug - agrega esto temporalmente
+const debugNgState = async (page) => {
+    console.log('=== DEBUG NG-STATE ===');
+    
+    // Ver si el selector existe
+    const selectorExists = await page.locator('script#ng-state').count();
+    console.log(`Selector ng-state existe: ${selectorExists > 0}`);
+    
+    if (selectorExists > 0) {
+        // Ver el contenido
+        const content = await page.$eval('script#ng-state', el => el.textContent);
+        console.log(`Contenido ng-state (primeros 200 chars): ${content.substring(0, 200)}...`);
+        
+        try {
+            const parsed = JSON.parse(content);
+            const keys = Object.keys(parsed);
+            console.log(`Claves principales en ng-state: ${keys.join(', ')}`);
+            
+            // Buscar datos
+            keys.forEach(key => {
+                if (parsed[key]?.b?.data?.data) {
+                    console.log(`Clave "${key}" tiene ${parsed[key].b.data.data.length} propiedades`);
+                }
+            });
+        } catch (e) {
+            console.log(`Error parseando JSON: ${e.message}`);
+        }
+    }
+    
+    // Ver elementos DOM
+    const domCount = await page.locator('qr-card-property').count();
+    console.log(`Elementos DOM qr-card-property: ${domCount}`);
+    
+    console.log('=== FIN DEBUG ===');
+};
+
 // Función SIMPLIFICADA para extraer ng-state
 const extractNgStateData = async (page) => {
     const ngStateSelector = 'script#ng-state';
