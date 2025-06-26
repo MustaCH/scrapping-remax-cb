@@ -74,7 +74,7 @@ async function scrapeRemax(startPage = 0, endPage) {
             
             try {
                 console.log(`Procesando página: ${currentPage}`);
-                const url = `https://www.remax.com.ar/listings/buy?page=${currentPage}&pageSize=2&sort=-createdAt&in:operationId=1&in:eStageId=0,1,2,3,4&locations=in:CB@C%C3%B3rdoba::::::`;
+                const url = `https://www.remax.com.ar/listings/buy?page=${currentPage}&pageSize=24&sort=-createdAt&in:operationId=1&in:eStageId=0,1,2,3,4&locations=in:CB@C%C3%B3rdoba::::::`;
                 await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 90000 });
                 
                 console.log(`  -> Esperando a que la lista de propiedades se popule completamente...`);
