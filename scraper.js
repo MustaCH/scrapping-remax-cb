@@ -110,12 +110,7 @@ async function scrapeRemax(startPage = 0, endPage) {
                         m2Cover: `${prop.dimensionCovered} m²`,
                         ambientes: prop.totalRooms > 0 ? `${prop.totalRooms} ambientes` : 'No disponible',
                         baños: prop.bathrooms > 0 ? `${prop.bathrooms} baños` : 'No disponible',
-                        url: `https://www.remax.com.ar/listings/${prop.slug}`,
-                        age: prop.age ?? null,
-                        propertyType: prop.propertyType?.value ?? 'No especificado',
-                        stage: prop.eStage?.value ?? 'No especificado',
-                        operationId: prop.operationId ?? null,
-                        tags: prop.tags?.map(tag => tag.value) || [], 
+                        url: `https://www.remax.com.ar/listings/${prop.slug}`
                     }
                 });
 
