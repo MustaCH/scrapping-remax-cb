@@ -28,6 +28,48 @@ const extractNgStateData = async (page) => {
     return jsonData[mainDataKey].b.data;
 };
 
+// Función mejorada para esperar que la página cargue completamente
+const waitForPageLoad = async (page, expectedCount = null) => {
+    console.log('  -> Esperando a que la página se cargue completamente...');
+    
+    // Primero esperamos a que aparezca al menos un elemento
+    try {
+        await page.waitForSelector('qr-card-property, .no-results, .empty-state', { 
+            timeout: 30000 
+        });
+    } catch (e) {
+        console.log('  -> ⚠️ Timeout esperando elementos de propiedades. Puede ser una página vacía.');
+        return false;
+    }
+
+    // Esperamos a que no haya cambios en el conteo durante 3 segundos
+    let stableCount = 0;
+    let lastCount = 0;
+    let attempts = 0;
+    const maxAttempts = 10;
+
+    while (attempts < maxAttempts) {
+        await page.waitForTimeout(1000); // Esperar 1 segundo
+        const currentCount = await page.locator('qr-card-property').count();
+        
+        if (currentCount === lastCount) {
+            stableCount++;
+            if (stableCount >= 3) { // 3 segundos de estabilidad
+                console.log(`  -> ✅ Página estable con ${currentCount} propiedades.`);
+                return currentCount > 0;
+            }
+        } else {
+            stableCount = 0;
+            lastCount = currentCount;
+            console.log(`  -> Conteo actual: ${currentCount} propiedades...`);
+        }
+        
+        attempts++;
+    }
+    
+    console.log(`  -> ⚠️ Timeout esperando estabilidad. Conteo final: ${lastCount}`);
+    return lastCount > 0;
+};
 
 async function getMaxPages() {
     let browser;
@@ -38,6 +80,9 @@ async function getMaxPages() {
         
         const firstPageUrl = `https://www.remax.com.ar/listings/buy?page=0&pageSize=24&sort=-createdAt&in:operationId=1&in:eStageId=0,1,2,3,4&locations=in:CB@C%C3%B3rdoba::::::`;
         await page.goto(firstPageUrl, { waitUntil: 'domcontentloaded', timeout: 90000 });
+
+        // Esperamos que la página cargue
+        await waitForPageLoad(page);
 
         // Extraemos los datos del JSON
         const data = await extractNgStateData(page);
@@ -77,25 +122,47 @@ async function scrapeRemax(startPage = 0, endPage) {
                 const url = `https://www.remax.com.ar/listings/buy?page=${currentPage}&pageSize=24&sort=-createdAt&in:operationId=1&in:eStageId=0,1,2,3,4&locations=in:CB@C%C3%B3rdoba::::::`;
                 await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 90000 });
                 
-                console.log(`  -> Esperando a que la lista de propiedades se popule completamente...`);
-
-                try {
-                    await page.waitForFunction(() => {
-                        return document.querySelectorAll('qr-card-property').length > 2;
-                    }, null, { timeout: 20000 }); 
-                    console.log('  -> ✅ Lista de propiedades populada.');
-                } catch (e) {
-                    const finalCount = await page.locator('qr-card-property').count();
-                    console.log(`  -> ⚠️  Timeout esperando la lista completa. Se encontraron solo ${finalCount} propiedades. Es posible que esta sea la última página. Continuando...`);
+                // Usamos la función mejorada de espera
+                const hasContent = await waitForPageLoad(page);
+                
+                if (!hasContent) {
+                    console.log(`  -> Página ${currentPage} parece estar vacía. Finalizando el lote.`);
+                    break;
                 }
                 
                 console.log(`  -> Extrayendo datos del script ng-state...`);
-                const apiData = await extractNgStateData(page);
+                
+                // Agregamos un pequeño delay adicional antes de extraer ng-state
+                await page.waitForTimeout(2000);
+                
+                let apiData;
+                try {
+                    apiData = await extractNgStateData(page);
+                } catch (ngStateError) {
+                    console.warn(`  -> ⚠️ Error extrayendo ng-state en página ${currentPage}: ${ngStateError.message}`);
+                    // Intentamos una vez más después de esperar
+                    await page.waitForTimeout(3000);
+                    try {
+                        apiData = await extractNgStateData(page);
+                    } catch (retryError) {
+                        console.warn(`  -> ⚠️ Error en segundo intento ng-state página ${currentPage}. Saltando...`);
+                        continue;
+                    }
+                }
+                
                 const propertiesData = apiData.data;
 
                 if (!propertiesData || propertiesData.length === 0) {
                     console.log(`  -> No se encontraron propiedades en la página ${currentPage}. Finalizando el lote.`);
                     break; 
+                }
+                
+                // Validamos que el conteo DOM coincida aproximadamente con los datos JSON
+                const domCount = await page.locator('qr-card-property').count();
+                console.log(`  -> Validación: DOM=${domCount} propiedades, JSON=${propertiesData.length} propiedades`);
+                
+                if (Math.abs(domCount - propertiesData.length) > 5) {
+                    console.warn(`  -> ⚠️ Discrepancia significativa entre DOM y JSON. Puede indicar carga incompleta.`);
                 }
                 
                 // Mapeamos los datos del JSON a la estructura que queremos
@@ -125,6 +192,11 @@ async function scrapeRemax(startPage = 0, endPage) {
 
                 console.log(`  -> Se encontraron ${pageProperties.length} propiedades.`);
                 allProperties = allProperties.concat(pageProperties);
+
+                // Pequeña pausa entre páginas para ser más amigable con el servidor
+                if (currentPage < endPage) {
+                    await page.waitForTimeout(1000);
+                }
 
             } catch (pageError) {
                 console.warn(`⚠️ Error al procesar la página ${currentPage}: ${pageError.message}. Continuando con la siguiente...`);
