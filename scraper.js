@@ -37,7 +37,7 @@ async function getMaxPages() {
         browser = await chromium.launch(launchOptions);
         const page = await browser.newPage({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36' });
         
-        const firstPageUrl = `https://www.remax.com.ar/listings/buy?page=0&pageSize=24&sort=-createdAt&in:operationId=1&in:eStageId=0,1,2,3,4&locations=in:CB@C%C3%B3rdoba::::::`;
+        const firstPageUrl = `https://www.remax.com.ar/listings/buy?page=0&pageSize=2&sort=-createdAt&in:operationId=1&in:eStageId=0,1,2,3,4&locations=in:CB@C%C3%B3rdoba::::::`;
         await page.goto(firstPageUrl, { waitUntil: 'domcontentloaded', timeout: 90000 });
 
         // Extraemos los datos del JSON
