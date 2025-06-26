@@ -115,7 +115,7 @@ async function scrapeRemax(startPage = 0, endPage) {
                         propertyType: prop.propertyType?.value ?? 'No especificado',
                         stage: prop.eStage?.value ?? 'No especificado',
                         operationId: prop.operationId ?? null,
-                        tags: tags 
+                        tags: prop.tags?.map(tag => tag.value) || [], 
                     }
                 });
 
