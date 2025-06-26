@@ -13,47 +13,82 @@ const launchOptions = {
     ]
 };
 
-// Función para extraer el JSON del script ng-state
+// ✅ Función mejorada para extraer propiedades desde ng-state
 const extractNgStateData = async (page) => {
     const ngStateSelector = 'script#ng-state';
     await page.waitForSelector(ngStateSelector, { state: 'attached', timeout: 30000 });
     const ngStateContent = await page.$eval(ngStateSelector, el => el.textContent);
     
-    const jsonData = JSON.parse(ngStateContent);
-    // Buscamos la clave que contiene la data principal. Usualmente es la primera.
-    const mainDataKey = Object.keys(jsonData).find(key => jsonData[key]?.b?.data?.data);
-    if (!mainDataKey) {
-        throw new Error('No se encontró la clave de datos principal en ng-state');
+    let jsonData;
+    try {
+        jsonData = JSON.parse(ngStateContent);
+    } catch (e) {
+        throw new Error('❌ No se pudo parsear ng-state como JSON');
     }
-    return jsonData[mainDataKey].b.data;
+
+    const allDataEntries = [];
+
+    for (const [key, value] of Object.entries(jsonData)) {
+        const list = value?.b?.data?.data;
+        if (Array.isArray(list) && list.length > 0 && list[0]?.title && list[0]?.slug) {
+            allDataEntries.push({
+                key,
+                data: list
+            });
+        }
+    }
+
+    if (allDataEntries.length === 0) {
+        throw new Error('❌ No se encontraron bloques válidos dentro de ng-state');
+    }
+
+    const mainBlock = allDataEntries.reduce((a, b) => (b.data.length > a.data.length ? b : a));
+
+    console.log(`✅ ng-state: usando clave "${mainBlock.key}" con ${mainBlock.data.length} propiedades`);
+
+    return mainBlock.data;
 };
 
-
+// 🚀 Obtener número total de páginas desde la clave que contiene ese dato
 async function getMaxPages() {
     let browser;
     console.log('getMaxPages: Iniciando navegador efímero...');
     try {
         browser = await chromium.launch(launchOptions);
-        const page = await browser.newPage({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36' });
-        
+        const page = await browser.newPage({
+            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
+        });
+
         const firstPageUrl = `https://www.remax.com.ar/listings/buy?page=0&pageSize=24&sort=-createdAt&in:operationId=1&in:eStageId=0,1,2,3,4&locations=in:CB@C%C3%B3rdoba::::::`;
+
         await page.goto(firstPageUrl, { waitUntil: 'domcontentloaded', timeout: 90000 });
 
-        // Extraemos los datos del JSON
-        const data = await extractNgStateData(page);
+        const ngStateSelector = 'script#ng-state';
+        await page.waitForSelector(ngStateSelector, { timeout: 10000 });
+        const ngStateContent = await page.$eval(ngStateSelector, el => el.textContent);
+        const jsonData = JSON.parse(ngStateContent);
 
-        if (data && data.totalPages) {
-            console.log(`Total de páginas encontrado en ng-state: ${data.totalPages}`);
-            return data.totalPages;
+        let totalPages = null;
+
+        for (const value of Object.values(jsonData)) {
+            const tp = value?.b?.data?.totalPages;
+            if (typeof tp === 'number') {
+                totalPages = tp;
+                break;
+            }
         }
 
-        // Fallback si no se encuentra
-        console.warn('No se pudo encontrar totalPages en ng-state, usando fallback.');
+        if (totalPages) {
+            console.log(`✅ Total de páginas encontrado en ng-state: ${totalPages}`);
+            return totalPages;
+        }
+
+        console.warn('⚠️ No se encontró totalPages en ng-state. Usando fallback.');
         return 175;
 
     } catch (err) {
-        console.warn(`Error en getMaxPages: ${err.message}. Usando fallback.`);
-        return 175; // Valor de fallback
+        console.warn(`⚠️ Error en getMaxPages: ${err.message}. Usando fallback.`);
+        return 175;
     } finally {
         if (browser) {
             await browser.close();
@@ -62,55 +97,44 @@ async function getMaxPages() {
     }
 }
 
+// 🔍 Scrapeo robusto de propiedades página por página usando ng-state
 async function scrapeRemax(startPage = 0, endPage) {
     let browser;
-    console.log(`scrapeRemax: Iniciando navegador efímero para lote de páginas ${startPage} a ${endPage}...`);
+    console.log(`scrapeRemax: Iniciando navegador efímero para páginas ${startPage} a ${endPage}...`);
     try {
         browser = await chromium.launch(launchOptions);
-        const page = await browser.newPage({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36' });
-        
-        let allProperties = [];
-        for (let currentPage = startPage; currentPage <= endPage; currentPage++) {
-            
-            try {
-                console.log(`Procesando página: ${currentPage}`);
-                const url = `https://www.remax.com.ar/listings/buy?page=${currentPage}&pageSize=24&sort=-createdAt&in:operationId=1&in:eStageId=0,1,2,3,4&locations=in:CB@C%C3%B3rdoba::::::`;
-                await page.goto(url, { waitUntil: 'networkidle', timeout: 90000 });
-                
-                console.log(`  -> Esperando a que la lista de propiedades se popule completamente...`);
+        const page = await browser.newPage({
+            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
+        });
 
-                try {
-                    await page.waitForFunction(() => {
-                        return document.querySelectorAll('qr-card-property').length > 2;
-                    }, null, { timeout: 20000 }); 
-                    console.log('  -> ✅ Lista de propiedades populada.');
-                } catch (e) {
-                    const finalCount = await page.locator('qr-card-property').count();
-                    console.log(`  -> ⚠️  Timeout esperando la lista completa. Se encontraron solo ${finalCount} propiedades. Es posible que esta sea la última página. Continuando...`);
-                }
-                
-                console.log(`  -> Extrayendo datos del script ng-state...`);
-                const apiData = await extractNgStateData(page);
-                const propertiesData = apiData.data;
+        let allProperties = [];
+
+        for (let currentPage = startPage; currentPage <= endPage; currentPage++) {
+            try {
+                console.log(`🌐 Procesando página ${currentPage}...`);
+                const url = `https://www.remax.com.ar/listings/buy?page=${currentPage}&pageSize=24&sort=-createdAt&in:operationId=1&in:eStageId=0,1,2,3,4&locations=in:CB@C%C3%B3rdoba::::::`;
+
+                await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 90000 });
+
+                const propertiesData = await extractNgStateData(page);
 
                 if (!propertiesData || propertiesData.length === 0) {
-                    console.log(`  -> No se encontraron propiedades en la página ${currentPage}. Finalizando el lote.`);
-                    break; 
+                    console.log(`  -> ⚠️ Página vacía. Finalizando.`);
+                    break;
                 }
-                
-                // Mapeamos los datos del JSON a la estructura que queremos
+
                 const pageProperties = propertiesData.map(prop => {
                     const price = prop.price ?? 0;
-                    const currency = prop.currency?.value ?? ''; // Si prop.currency no existe, currency será ''
+                    const currency = prop.currency?.value ?? '';
                     const formattedPrice = (price > 0 && currency) ? `${price} ${currency}` : 'Consultar';
 
                     return {
                         title: prop.title,
                         price: formattedPrice,
                         address: prop.displayAddress,
-                        locality: prop.geoLabel, 
-                        latitude: prop.location?.coordinates?.[1] ?? 'No disponible', 
-                        longitude: prop.location?.coordinates?.[0] ?? 'No disponible', 
+                        locality: prop.geoLabel,
+                        latitude: prop.location?.coordinates?.[1] ?? 'No disponible',
+                        longitude: prop.location?.coordinates?.[0] ?? 'No disponible',
                         brokers: prop.listBroker?.map(b => `${b.name} ${b.license}`).join(', ') ?? 'No disponible',
                         contactPerson: prop.associate?.name ?? 'No disponible',
                         office: prop.associate?.officeName ?? 'No disponible',
@@ -120,25 +144,27 @@ async function scrapeRemax(startPage = 0, endPage) {
                         ambientes: prop.totalRooms > 0 ? `${prop.totalRooms} ambientes` : 'No disponible',
                         baños: prop.bathrooms > 0 ? `${prop.bathrooms} baños` : 'No disponible',
                         url: `https://www.remax.com.ar/listings/${prop.slug}`
-                    }
+                    };
                 });
 
-                console.log(`  -> Se encontraron ${pageProperties.length} propiedades.`);
+                console.log(`  -> ✅ ${pageProperties.length} propiedades extraídas.`);
                 allProperties = allProperties.concat(pageProperties);
 
-            } catch (pageError) {
-                console.warn(`⚠️ Error al procesar la página ${currentPage}: ${pageError.message}. Continuando con la siguiente...`);
+            } catch (error) {
+                console.warn(`⚠️ Error al procesar la página ${currentPage}: ${error.message}. Continuando...`);
                 continue;
             }
         }
+
         return allProperties;
+
     } catch (error) {
-        console.error(`Error fatal en scrapeRemax para lote ${startPage}-${endPage}:`, error);
+        console.error(`❌ Error fatal en scrapeRemax:`, error);
         throw error;
     } finally {
         if (browser) {
             await browser.close();
-            console.log(`scrapeRemax: Navegador efímero para lote ${startPage}-${endPage} cerrado.`);
+            console.log(`scrapeRemax: Navegador cerrado para lote ${startPage}-${endPage}.`);
         }
     }
 }
