@@ -38,7 +38,22 @@ async function getMaxPages() {
         const page = await browser.newPage({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36' });
         
         const firstPageUrl = `https://www.remax.com.ar/listings/buy?page=0&pageSize=2&sort=-createdAt&in:operationId=1&in:eStageId=0,1,2,3,4&locations=in:CB@C%C3%B3rdoba::::::`;
+        
+        page.on('response', async response => {
+        const url = response.url();
+        if (url.includes('/listings') && response.request().resourceType() !== 'document') {
+            try {
+            const json = await response.json();
+            console.log('🎯 Intercepted listings JSON:', json);
+            // Guarda json.data para usarlo luego en vez de #
+            } catch {}
+        }
+        });
+
         await page.goto(firstPageUrl, { waitUntil: 'domcontentloaded', timeout: 90000 });
+
+        await page.waitForResponse(r => r.url().includes('/listings?'));
+        console.log(`Se recopilaron ${listings.length} propiedades.`);
 
         // Extraemos los datos del JSON
         const data = await extractNgStateData(page);
