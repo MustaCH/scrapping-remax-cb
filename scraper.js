@@ -13,186 +13,95 @@ const launchOptions = {
     ]
 };
 
-// Función para debug - agrega esto temporalmente
-const debugNgState = async (page) => {
-    console.log('=== DEBUG NG-STATE ===');
-    
-    // Ver si el selector existe
-    const selectorExists = await page.locator('script#ng-state').count();
-    console.log(`Selector ng-state existe: ${selectorExists > 0}`);
-    
-    if (selectorExists > 0) {
-        // Ver el contenido
-        const content = await page.$eval('script#ng-state', el => el.textContent);
-        console.log(`Contenido ng-state (primeros 200 chars): ${content.substring(0, 200)}...`);
-        
-        try {
-            const parsed = JSON.parse(content);
-            const keys = Object.keys(parsed);
-            console.log(`Claves principales en ng-state: ${keys.join(', ')}`);
-            
-            // Buscar datos
-            keys.forEach(key => {
-                if (parsed[key]?.b?.data?.data) {
-                    console.log(`Clave "${key}" tiene ${parsed[key].b.data.data.length} propiedades`);
-                }
-            });
-        } catch (e) {
-            console.log(`Error parseando JSON: ${e.message}`);
-        }
-    }
-    
-    // Ver elementos DOM
-    const domCount = await page.locator('qr-card-property').count();
-    console.log(`Elementos DOM qr-card-property: ${domCount}`);
-    
-    console.log('=== FIN DEBUG ===');
-};
-
-// Función SIMPLIFICADA para extraer ng-state
+// Función para extraer el JSON del script ng-state
 const extractNgStateData = async (page) => {
     const ngStateSelector = 'script#ng-state';
-    
-    // Esperar a que el selector exista
-    await page.waitForSelector(ngStateSelector, { timeout: 30000 });
-    
-    // Dar tiempo para que se actualice el contenido
-    await page.waitForTimeout(3000);
-    
+    await page.waitForSelector(ngStateSelector, { state: 'attached', timeout: 30000 });
     const ngStateContent = await page.$eval(ngStateSelector, el => el.textContent);
-    const jsonData = JSON.parse(ngStateContent);
     
-    // Buscamos la clave que contiene los datos
+    const jsonData = JSON.parse(ngStateContent);
+    // Buscamos la clave que contiene la data principal. Usualmente es la primera.
     const mainDataKey = Object.keys(jsonData).find(key => jsonData[key]?.b?.data?.data);
     if (!mainDataKey) {
         throw new Error('No se encontró la clave de datos principal en ng-state');
     }
-    
     return jsonData[mainDataKey].b.data;
 };
 
-// Función simplificada para esperar que cargue la página
-const waitForPageLoad = async (page) => {
-    console.log('  -> Esperando carga de la página...');
-    
-    // Estrategia 1: Esperar a que aparezcan propiedades
-    try {
-        await page.waitForSelector('qr-card-property', { timeout: 20000 });
-        console.log('  -> ✅ Propiedades detectadas en DOM');
-    } catch (e) {
-        console.log('  -> ⚠️ No se detectaron propiedades en DOM, puede ser página vacía');
-        return false;
-    }
-    
-    // Estrategia 2: Esperar un poco más para estabilidad
-    await page.waitForTimeout(5000);
-    
-    const count = await page.locator('qr-card-property').count();
-    console.log(`  -> Total propiedades DOM: ${count}`);
-    
-    return count > 0;
-};
 
 async function getMaxPages() {
     let browser;
     console.log('getMaxPages: Iniciando navegador efímero...');
     try {
         browser = await chromium.launch(launchOptions);
-        const page = await browser.newPage({ 
-            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36' 
-        });
+        const page = await browser.newPage({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36' });
         
         const firstPageUrl = `https://www.remax.com.ar/listings/buy?page=0&pageSize=24&sort=-createdAt&in:operationId=1&in:eStageId=0,1,2,3,4&locations=in:CB@C%C3%B3rdoba::::::`;
         await page.goto(firstPageUrl, { waitUntil: 'domcontentloaded', timeout: 90000 });
 
-        await waitForPageLoad(page);
+        // Extraemos los datos del JSON
         const data = await extractNgStateData(page);
 
         if (data && data.totalPages) {
-            console.log(`Total de páginas encontrado: ${data.totalPages}`);
+            console.log(`Total de páginas encontrado en ng-state: ${data.totalPages}`);
             return data.totalPages;
         }
 
-        console.warn('No se encontró totalPages, usando fallback.');
+        // Fallback si no se encuentra
+        console.warn('No se pudo encontrar totalPages en ng-state, usando fallback.');
         return 175;
 
     } catch (err) {
         console.warn(`Error en getMaxPages: ${err.message}. Usando fallback.`);
-        return 175;
+        return 175; // Valor de fallback
     } finally {
         if (browser) {
             await browser.close();
-            console.log('getMaxPages: Navegador cerrado.');
+            console.log('getMaxPages: Navegador efímero cerrado.');
         }
     }
 }
 
 async function scrapeRemax(startPage = 0, endPage) {
     let browser;
-    console.log(`scrapeRemax: Procesando páginas ${startPage} a ${endPage}...`);
-    
+    console.log(`scrapeRemax: Iniciando navegador efímero para lote de páginas ${startPage} a ${endPage}...`);
     try {
         browser = await chromium.launch(launchOptions);
-        const page = await browser.newPage({ 
-            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36' 
-        });
+        const page = await browser.newPage({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36' });
         
         let allProperties = [];
-        
         for (let currentPage = startPage; currentPage <= endPage; currentPage++) {
+            
             try {
                 console.log(`Procesando página: ${currentPage}`);
                 const url = `https://www.remax.com.ar/listings/buy?page=${currentPage}&pageSize=24&sort=-createdAt&in:operationId=1&in:eStageId=0,1,2,3,4&locations=in:CB@C%C3%B3rdoba::::::`;
-                
                 await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 90000 });
                 
-                const hasContent = await waitForPageLoad(page);
-                if (!hasContent) {
-                    console.log(`  -> Página ${currentPage} vacía. Finalizando lote.`);
-                    break;
-                }
-                
-                // Contar propiedades DOM
-                const domCount = await page.locator('qr-card-property').count();
-                
-                console.log(`  -> Extrayendo ng-state...`);
-                let apiData;
-                
+                console.log(`  -> Esperando a que la lista de propiedades se popule completamente...`);
+
                 try {
-                    apiData = await extractNgStateData(page);
-                } catch (ngError) {
-                    console.warn(`  -> Error extrayendo ng-state: ${ngError.message}`);
-                    console.log(`  -> Reintentando una vez más...`);
-                    
-                    // UN SOLO reintento con más tiempo
-                    await page.waitForTimeout(8000);
-                    try {
-                        apiData = await extractNgStateData(page);
-                    } catch (retryError) {
-                        console.error(`  -> Falló completamente página ${currentPage}. Continuando...`);
-                        continue;
-                    }
+                    await page.waitForFunction(() => {
+                        return document.querySelectorAll('qr-card-property').length > 2;
+                    }, null, { timeout: 20000 }); 
+                    console.log('  -> ✅ Lista de propiedades populada.');
+                } catch (e) {
+                    const finalCount = await page.locator('qr-card-property').count();
+                    console.log(`  -> ⚠️  Timeout esperando la lista completa. Se encontraron solo ${finalCount} propiedades. Es posible que esta sea la última página. Continuando...`);
                 }
                 
+                console.log(`  -> Extrayendo datos del script ng-state...`);
+                const apiData = await extractNgStateData(page);
                 const propertiesData = apiData.data;
-                
+
                 if (!propertiesData || propertiesData.length === 0) {
-                    console.log(`  -> Sin datos en página ${currentPage}. Finalizando lote.`);
-                    break;
+                    console.log(`  -> No se encontraron propiedades en la página ${currentPage}. Finalizando el lote.`);
+                    break; 
                 }
                 
-                console.log(`  -> DOM: ${domCount} propiedades, JSON: ${propertiesData.length} propiedades`);
-                
-                // Si hay una gran discrepancia, pero tenemos datos JSON, los usamos
-                if (domCount > 10 && propertiesData.length < 5) {
-                    console.warn(`  -> ⚠️ Gran discrepancia detectada. Puede haber un problema de timing.`);
-                    // Pero continuamos con los datos que tenemos
-                }
-                
-                // Mapear datos a estructura final
+                // Mapeamos los datos del JSON a la estructura que queremos
                 const pageProperties = propertiesData.map(prop => {
                     const price = prop.price ?? 0;
-                    const currency = prop.currency?.value ?? '';
+                    const currency = prop.currency?.value ?? ''; // Si prop.currency no existe, currency será ''
                     const formattedPrice = (price > 0 && currency) ? `${price} ${currency}` : 'Consultar';
 
                     return {
@@ -214,29 +123,22 @@ async function scrapeRemax(startPage = 0, endPage) {
                     }
                 });
 
-                console.log(`  -> ✅ Extraídas ${pageProperties.length} propiedades`);
+                console.log(`  -> Se encontraron ${pageProperties.length} propiedades.`);
                 allProperties = allProperties.concat(pageProperties);
-                
-                // Pausa entre páginas
-                await page.waitForTimeout(2000);
 
             } catch (pageError) {
-                console.error(`❌ Error en página ${currentPage}: ${pageError.message}`);
-                // Continuamos con la siguiente página
+                console.warn(`⚠️ Error al procesar la página ${currentPage}: ${pageError.message}. Continuando con la siguiente...`);
                 continue;
             }
         }
-        
-        console.log(`✅ Lote completado: ${allProperties.length} propiedades totales`);
         return allProperties;
-        
     } catch (error) {
-        console.error(`Error fatal en scrapeRemax:`, error);
+        console.error(`Error fatal en scrapeRemax para lote ${startPage}-${endPage}:`, error);
         throw error;
     } finally {
         if (browser) {
             await browser.close();
-            console.log(`scrapeRemax: Navegador cerrado.`);
+            console.log(`scrapeRemax: Navegador efímero para lote ${startPage}-${endPage} cerrado.`);
         }
     }
 }
