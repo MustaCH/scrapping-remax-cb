@@ -56,7 +56,13 @@ async function getMaxPages() {
     try {
         browser = await chromium.launch(launchOptions);
         const page = await browser.newPage({
-            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
+            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+             // ▼▼▼ MODIFICACIÓN INICIO ▼▼▼
+            // Se establece un viewport de móvil para asegurar que el paginador sea visible.
+            // El elemento tiene la clase "hide-gt-sm", que lo oculta en pantallas de escritorio.
+            // Al simular un dispositivo pequeño, evitamos que ese estilo CSS se aplique.
+            viewport: { width: 390, height: 844 }
+            // ▲▲▲ MODIFICACIÓN FIN ▲▲▲
         });
 
         const firstPageUrl = `https://www.remax.com.ar/listings/buy?page=0&pageSize=24&sort=-createdAt&in:operationId=1&in:eStageId=0,1,2,3,4&locations=in:CB@C%C3%B3rdoba::::::`;
