@@ -149,7 +149,14 @@ async function scrapeRemax(startPage = 0, endPage) {
                         m2Cover: `${prop.dimensionCovered} m²`,
                         ambientes: prop.totalRooms > 0 ? `${prop.totalRooms} ambientes` : 'No disponible',
                         baños: prop.bathrooms > 0 ? `${prop.bathrooms} baños` : 'No disponible',
-                        url: `https://www.remax.com.ar/listings/${prop.slug}`
+                        url: `https://www.remax.com.ar/listings/${prop.slug}`,
+                        operation: prop.operation?.id === 1 
+                                        ? 'Venta' 
+                                        : prop.operation?.id === 2 
+                                            ? 'Alquiler' 
+                                            : prop.operation?.id === 3 
+                                            ? 'Alquiler temporario' 
+                                            : ''
                     };
                 });
 
