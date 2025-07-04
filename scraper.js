@@ -71,26 +71,18 @@ async function getMaxPages() {
 
         const paginatorSelector = '.p-container-paginator p';
         await page.waitForSelector(paginatorSelector, { timeout: 10000 });
-        const ngStateContent = await page.$eval(paginatorSelector, el => el.textContent);
-        const jsonData = JSON.parse(ngStateContent);
+        const paginatorText = await page.$eval(paginatorSelector, el => el.innerText);
+        console.log(`🔍 Texto del paginador: "${paginatorText}"`);
 
-        let totalPages = null;
-
-        for (const value of Object.values(jsonData)) {
-            const tp = value?.b?.data?.totalPages;
-            if (typeof tp === 'number') {
-                totalPages = tp;
-                break;
-            }
-        }
-
-        if (totalPages) {
-            console.log(`✅ Total de páginas encontrado en paginator: ${totalPages}`);
+        const match = paginatorText.match(/de\s+(\d+)/i);
+        if (match && match[1]) {
+            const totalPages = parseInt(match[1], 10);
+            console.log(`✅ Total de páginas detectado: ${totalPages}`);
             return totalPages;
+        } else {
+            console.warn('⚠️ No se pudo extraer el número total de páginas. Usando fallback.');
+            return 175;
         }
-
-        console.warn('⚠️ No se encontró totalPages en paginator. Usando fallback.');
-        return 175;
 
     } catch (err) {
         console.warn(`⚠️ Error en getMaxPages: ${err.message}. Usando fallback.`);
