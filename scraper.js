@@ -69,9 +69,9 @@ async function getMaxPages() {
 
         await page.goto(firstPageUrl, { waitUntil: 'domcontentloaded', timeout: 90000 });
 
-        const ngStateSelector = 'script#ng-state';
-        await page.waitForSelector(ngStateSelector, { timeout: 10000 });
-        const ngStateContent = await page.$eval(ngStateSelector, el => el.textContent);
+        const paginatorSelector = '.p-container-paginator p';
+        await page.waitForSelector(paginatorSelector, { timeout: 10000 });
+        const ngStateContent = await page.$eval(paginatorSelector, el => el.textContent);
         const jsonData = JSON.parse(ngStateContent);
 
         let totalPages = null;
@@ -85,11 +85,11 @@ async function getMaxPages() {
         }
 
         if (totalPages) {
-            console.log(`✅ Total de páginas encontrado en ng-state: ${totalPages}`);
+            console.log(`✅ Total de páginas encontrado en paginator: ${totalPages}`);
             return totalPages;
         }
 
-        console.warn('⚠️ No se encontró totalPages en ng-state. Usando fallback.');
+        console.warn('⚠️ No se encontró totalPages en paginator. Usando fallback.');
         return 175;
 
     } catch (err) {
