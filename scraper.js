@@ -121,7 +121,9 @@ async function scrapeRemax(startPage = 0, endPage) {
                     break;
                 }
 
-                const pageProperties = propertiesData.map(prop => {
+                const pageProperties = propertiesData
+                    .filter(prop => prop.listingStatus === "active")
+                    .map(prop => {
                     const price = prop.price ?? 0;
                     const currency = prop.currency?.value ?? '';
                     const formattedPrice = (price > 0 && currency) ? `${price} ${currency}` : 'Consultar';
@@ -141,6 +143,7 @@ async function scrapeRemax(startPage = 0, endPage) {
                         m2Cover: `${prop.dimensionCovered} m²`,
                         ambientes: prop.totalRooms > 0 ? `${prop.totalRooms} ambientes` : 'No disponible',
                         baños: prop.bathrooms > 0 ? `${prop.bathrooms} baños` : 'No disponible',
+                        propertyType: prop.type?.value ?? 'No disponible',
                         url: `https://www.remax.com.ar/listings/${prop.slug}`,
                         operation: prop.operation?.id === 1 
                                         ? 'Venta' 
