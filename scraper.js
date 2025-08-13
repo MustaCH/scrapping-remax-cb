@@ -122,7 +122,7 @@ async function scrapeRemax(startPage = 0, endPage) {
                 }
 
                 const pageProperties = propertiesData
-                    .filter(prop => prop.listingStatus === "active")
+                    .filter(prop => prop.listingStatus.value === "active")
                     .map(prop => {
                     const price = prop.price ?? 0;
                     const currency = prop.currency?.value ?? '';
