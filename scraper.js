@@ -157,7 +157,8 @@ async function scrapeRemax(startPage = 0, endPage) {
 
             return {
               title: prop.title,
-              price: formattedPrice,
+              price: prop.price ?? null,
+              currency: prop.currency?.value ?? null,
               address: prop.displayAddress,
               locality: prop.geoLabel,
               latitude: prop.location?.coordinates?.[1] ?? null,
