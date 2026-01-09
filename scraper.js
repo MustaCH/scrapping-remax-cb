@@ -13,6 +13,32 @@ const launchOptions = {
     ]
 };
 
+const CDN_BASE = 'https://d1acdg20u0pmxj.cloudfront.net';
+const DEFAULT_IMAGE_SIZE = 'AUTOx860';
+const DEFAULT_IMAGE_EXT = 'webp';
+
+function rawToCdnUrl(rawValue, size = DEFAULT_IMAGE_SIZE, ext = DEFAULT_IMAGE_EXT) {
+    const normalized = String(rawValue || '').replace(/\\/g, '/').replace(/^\/+/, '');
+    const parts = normalized.split('/').filter(Boolean);
+    if (parts.length < 3) return null;
+    const [root, listingId, photoId] = parts;
+    if (root !== 'listings') return null;
+    return `${CDN_BASE}/${root}/${listingId}/${size}/${photoId}.${ext}`;
+}
+
+function buildListingPhotoUrls(photos, limit = 3) {
+    if (!Array.isArray(photos) || photos.length === 0) return [];
+    const urls = [];
+    for (const photo of photos) {
+        const url = rawToCdnUrl(photo?.rawValue);
+        if (url && !urls.includes(url)) {
+            urls.push(url);
+        }
+        if (urls.length >= limit) break;
+    }
+    return urls;
+}
+
 // ✅ Función mejorada para extraer propiedades desde ng-state
 const extractNgStateData = async (page) => {
     const ngStateSelector = 'script#ng-state';
@@ -145,6 +171,7 @@ async function scrapeRemax(startPage = 0, endPage) {
                         baños: prop.bathrooms > 0 ? `${prop.bathrooms} baños` : 'No disponible',
                         propertyType: prop.type?.value ?? 'No disponible',
                         url: `https://www.remax.com.ar/listings/${prop.slug}`,
+                        photos: buildListingPhotoUrls(prop.photos, 3),
                         operation: prop.operation?.id === 1 
                                         ? 'Venta' 
                                         : prop.operation?.id === 2 
