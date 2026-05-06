@@ -16,12 +16,13 @@ app.use((req, res, next) => {
 
 app.get('/api/scrape', async (req, res) => {
     try {
+        const operationId = parseInt(req.query.operationId) || 1;
         const mode = req.query.mode;
 
         if (mode === 'checkMaxPages') {
-            console.log('Modo: Obteniendo número máximo de páginas...');
-            const maxPages = await scraper.getMaxPages();
-            return res.status(200).json({ success: true, maxPages: maxPages });
+            console.log(`Modo: máximo de páginas (operationId=${operationId})...`);
+            const maxPages = await scraper.getMaxPages(operationId);
+            return res.status(200).json({ success: true, operationId, maxPages });
         }
 
         const startPage = parseInt(req.query.startPage) || 0;
@@ -32,12 +33,12 @@ app.get('/api/scrape', async (req, res) => {
         }
         const endPage = parseInt(endPageQuery);
 
-        console.log(`Iniciando scraping desde página ${startPage} hasta página ${endPage}`);
-        const properties = await scraper.scrapeRemax(startPage, endPage);
-        return res.status(200).json({ success: true, data: properties });
+        console.log(`Scraping operationId=${operationId} páginas ${startPage} a ${endPage}`);
+        const properties = await scraper.scrapeRemax(startPage, endPage, operationId);
+        return res.status(200).json({ success: true, operationId, count: properties.length, data: properties });
 
     } catch (err) {
-        console.error('Error crítico en la ruta /api/scrape:', err);
+        console.error('Error crítico en /api/scrape:', err);
         return res.status(500).json({ success: false, error: err.message });
     }
 });
