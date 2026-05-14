@@ -27,10 +27,22 @@ const OPERATION_LABELS = {
   3: "Alquiler temporario",
 };
 
+// Path en la URL de listings según operationId. Remax cambió el routing:
+// pedir /listings/buy con operationId=2 ya no devuelve alquileres.
+// Remax solo acepta "buy" y "rent" como path. El filtro real es el
+// query param operationId. Para temporario usamos /rent (sólo cambia el
+// landing visual; el listado lo determina operationId=3).
+const OPERATION_PATHS = {
+  1: "buy",
+  2: "rent",
+  3: "rent",
+};
+
 const VALID_OPERATION_IDS = Object.keys(OPERATION_LABELS).map(Number);
 
 function buildListingsUrl(operationId, pageNum) {
-  return `https://www.remax.com.ar/listings/buy?page=${pageNum}&pageSize=24&sort=-createdAt&in:operationId=${operationId}&in:eStageId=0,1,2,3,4&locations=in:CB@C%C3%B3rdoba::::::`;
+  const path = OPERATION_PATHS[operationId] ?? "buy";
+  return `https://www.remax.com.ar/listings/${path}?page=${pageNum}&pageSize=24&sort=-createdAt&in:operationId=${operationId}&locations=in:CB@C%C3%B3rdoba::::::`;
 }
 
 function rawToCdnUrl(rawValue, size = DEFAULT_IMAGE_SIZE, ext = DEFAULT_IMAGE_EXT) {
